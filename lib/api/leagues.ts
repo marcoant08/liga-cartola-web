@@ -15,9 +15,6 @@ export const leaguesApi = {
     description: string;
     roundValue: number;
     maxParticipants: number;
-    pixKey: string;
-    teamName: string;
-    isGuest: false;
   }) {
     return apiFetch<League>("/leagues", {
       method: "POST",
