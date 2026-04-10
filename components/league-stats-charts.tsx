@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { useMemo } from "react";
 import {
   Bar,
@@ -10,10 +11,12 @@ import {
   Pie,
   PieChart,
   ReferenceLine,
+  Rectangle,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
+  type BarShapeProps,
 } from "recharts";
 import type { LeagueMember, Round } from "@/lib/types/api";
 import { aggregateWinnerStats, type SeasonPlayerLine } from "@/lib/stats";
@@ -33,6 +36,56 @@ function shortLabel(name: string, max = 14): string {
   const t = name.trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
+
+function barValueNumber(value: BarShapeProps["value"]): number | undefined {
+  if (typeof value === "number") return value;
+  if (Array.isArray(value) && value.length >= 2) return value[1] - value[0];
+  return undefined;
+}
+
+function isZeroBarValue(value: BarShapeProps["value"]): boolean {
+  const n = barValueNumber(value);
+  return n !== undefined && Number.isFinite(n) && Math.abs(n) < 1e-9;
+}
+
+/** Barra vertical: linha cinza no eixo quando o valor é zero (continua contando no eixo X). */
+function makeVerticalBarShape(fallbackFill: string, radius: [number, number, number, number] = [4, 4, 0, 0]) {
+  return function VerticalBarShape(props: BarShapeProps): ReactElement {
+    const { x, y, width, height, value, fill, index } = props;
+    if (isZeroBarValue(value)) {
+      const yLine = y + height;
+      return (
+        <g key={`zero-${index}`}>
+          <line
+            x1={x + width * 0.15}
+            x2={x + width * 0.85}
+            y1={yLine}
+            y2={yLine}
+            className="stroke-zinc-400 dark:stroke-zinc-500"
+            strokeWidth={3}
+            strokeLinecap="round"
+          />
+        </g>
+      );
+    }
+    return (
+      <Rectangle
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        radius={radius}
+        fill={fill ?? fallbackFill}
+        isAnimationActive={props.isAnimationActive}
+      />
+    );
+  };
+}
+
+const shapeVitórias = makeVerticalBarShape("#059669");
+const shapeGanhos = makeVerticalBarShape("#059669");
+const shapePerdas = makeVerticalBarShape("#dc2626");
+const shapeLucro = makeVerticalBarShape("#059669");
 
 type Props = {
   rounds: Round[];
@@ -144,7 +197,13 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                   border: "1px solid var(--color-zinc-200, #e4e4e7)",
                 }}
               />
-              <Bar dataKey="vitórias" fill="#059669" radius={[4, 4, 0, 0]} name="Vitórias" />
+              <Bar
+                dataKey="vitórias"
+                fill="#059669"
+                radius={[4, 4, 0, 0]}
+                name="Vitórias"
+                shape={shapeVitórias}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -163,7 +222,13 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
                 <Tooltip formatter={(v) => [moneyFmt(v), "Recebimentos"]} />
-                <Bar dataKey="valor" fill="#059669" radius={[4, 4, 0, 0]} name="Recebimentos" />
+                <Bar
+                  dataKey="valor"
+                  fill="#059669"
+                  radius={[4, 4, 0, 0]}
+                  name="Recebimentos"
+                  shape={shapeGanhos}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -181,7 +246,13 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
                 <Tooltip formatter={(v) => [moneyFmt(v), "Perdas"]} />
-                <Bar dataKey="valor" fill="#dc2626" radius={[4, 4, 0, 0]} name="Perdas" />
+                <Bar
+                  dataKey="valor"
+                  fill="#dc2626"
+                  radius={[4, 4, 0, 0]}
+                  name="Perdas"
+                  shape={shapePerdas}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -198,7 +269,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
                 <Tooltip formatter={(v) => [moneyFmt(v), "Lucro"]} />
                 <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
-                <Bar dataKey="valor" name="Lucro" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="valor" name="Lucro" radius={[4, 4, 0, 0]} shape={shapeLucro}>
                   {top5Lucros.map((e, i) => (
                     <Cell key={i} fill={e.valor >= 0 ? "#059669" : "#dc2626"} />
                   ))}
