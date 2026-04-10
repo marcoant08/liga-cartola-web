@@ -38,6 +38,7 @@ type Props = {
   roundValue: number;
   memberCount: number;
   members: LeagueMember[];
+  registeredRoundsCount: number;
   players: SeasonPlayerLine[];
   winnerByRound: Map<number, string>;
   lastRound: Round | null;
@@ -47,6 +48,7 @@ export function LeagueStatsTextBlocks({
   roundValue,
   memberCount,
   members,
+  registeredRoundsCount,
   players,
   winnerByRound,
   lastRound,
@@ -171,7 +173,15 @@ export function LeagueStatsTextBlocks({
 
       <StatSection title="➗ Percentual de vitórias">
         <p className="mb-3 text-xs text-zinc-500">
-          Sobre {SEASON_TOTAL_ROUNDS} rodadas do campeonato (vitórias ÷ {SEASON_TOTAL_ROUNDS}).
+          {registeredRoundsCount === 0 ? (
+            <>Sem rodadas cadastradas — todos com 0%.</>
+          ) : (
+            <>
+              Com base em <strong>{registeredRoundsCount}</strong> rodada
+              {registeredRoundsCount === 1 ? "" : "s"} cadastrada
+              {registeredRoundsCount === 1 ? "" : "s"} (vitórias ÷ {registeredRoundsCount}).
+            </>
+          )}
         </p>
         {players.map((p) => (
           <LineRow

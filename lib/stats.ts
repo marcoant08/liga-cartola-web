@@ -94,6 +94,8 @@ export function computeSeasonPlayerLines(
     arr.sort((a, b) => a - b);
   }
 
+  const registeredRounds = rounds.length;
+
   const lines: SeasonPlayerLine[] = members.map((m) => {
     const wins = winsByUser.get(m.userId) ?? 0;
     const roundsWon = roundsWonByUser.get(m.userId) ?? [];
@@ -101,7 +103,8 @@ export function computeSeasonPlayerLines(
     const recebimentos = wins * rv;
     const perdas = -(SEASON_TOTAL_ROUNDS - wins) * contribPerRoundPerPlayer;
     const lucro = recebimentos + perdas;
-    const pctVitórias = (wins / SEASON_TOTAL_ROUNDS) * 100;
+    const pctVitórias =
+      registeredRounds > 0 ? (wins / registeredRounds) * 100 : 0;
 
     return {
       userId: m.userId,

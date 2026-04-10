@@ -112,6 +112,7 @@ export default function LeagueStatsPage() {
         roundValue={roundValue}
         memberCount={members.length}
         members={members}
+        registeredRoundsCount={rounds.length}
         players={seasonStats.players}
         winnerByRound={seasonStats.winnerByRound}
         lastRound={seasonStats.lastRound}
