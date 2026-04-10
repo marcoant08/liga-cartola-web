@@ -34,6 +34,18 @@ function LineRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+/** Verde se positivo, vermelho se negativo, padrão se zero — recebimentos, perdas e lucro. */
+function moneyValueNode(value: number): ReactNode {
+  const text = formatBRL(value);
+  if (value > 0) {
+    return <span className="text-emerald-600 dark:text-emerald-400">{text}</span>;
+  }
+  if (value < 0) {
+    return <span className="text-red-600 dark:text-red-400">{text}</span>;
+  }
+  return text;
+}
+
 type Props = {
   roundValue: number;
   memberCount: number;
@@ -59,6 +71,23 @@ export function LeagueStatsTextBlocks({
     const ta = (a.teamName?.trim() || a.userName).toLowerCase();
     const tb = (b.teamName?.trim() || b.userName).toLowerCase();
     return ta.localeCompare(tb, "pt-BR");
+  });
+
+  /** Perdas são negativas: menor valor = maior perda em R$. */
+  const playersByPerdasDesc = [...players].sort((a, b) => {
+    if (a.perdas !== b.perdas) return a.perdas - b.perdas;
+    return a.displayName.localeCompare(b.displayName, "pt-BR");
+  });
+
+  const derrotasCount = (p: SeasonPlayerLine) =>
+    registeredRoundsCount === 0 ? 0 : registeredRoundsCount - p.wins;
+
+  /** Mais derrotas primeiro (rodadas em que não venceu). */
+  const playersByDerrotasDesc = [...players].sort((a, b) => {
+    const da = derrotasCount(a);
+    const db = derrotasCount(b);
+    if (da !== db) return db - da;
+    return a.displayName.localeCompare(b.displayName, "pt-BR");
   });
 
   return (
@@ -156,6 +185,30 @@ export function LeagueStatsTextBlocks({
         ))}
       </StatSection>
 
+      <StatSection title="❌ Número de derrotas no campeonato">
+        <p className="mb-3 text-xs text-zinc-500">
+          {registeredRoundsCount === 0 ? (
+            <>Sem rodadas cadastradas — todos com 0 derrotas.</>
+          ) : (
+            <>
+              Conta só rodadas <strong>já registradas</strong> ({registeredRoundsCount}): em cada uma, quem não
+              foi campeão soma 1 derrota (igual a {registeredRoundsCount} − vitórias).
+            </>
+          )}
+        </p>
+        {players.length === 0 ? (
+          <p className="text-zinc-500">Nenhum membro na liga.</p>
+        ) : (
+          playersByDerrotasDesc.map((p) => (
+            <LineRow
+              key={p.userId}
+              label={p.displayName}
+              value={String(derrotasCount(p))}
+            />
+          ))
+        )}
+      </StatSection>
+
       <StatSection title="🔄 Vencedores das rodadas">
         {winnerByRound.size === 0 ? (
           <p className="text-zinc-500">Nenhuma rodada com vencedor registrado.</p>
@@ -201,7 +254,7 @@ export function LeagueStatsTextBlocks({
           <LineRow
             key={p.userId}
             label={p.displayName}
-            value={formatBRL(p.recebimentos)}
+            value={moneyValueNode(p.recebimentos)}
           />
         ))}
       </StatSection>
@@ -212,11 +265,11 @@ export function LeagueStatsTextBlocks({
             ? "Sem rodadas registradas — sem perdas contabilizadas."
             : `Só entram rodadas já registradas (${registeredRoundsCount}). Em cada uma em que não venceu, paga R$ ${roundValue.toFixed(2)} ao campeão: −(${registeredRoundsCount} − vitórias) × R$ ${roundValue.toFixed(2)}.`}
         </p>
-        {players.map((p) => (
+        {playersByPerdasDesc.map((p) => (
           <LineRow
             key={p.userId}
             label={p.displayName}
-            value={formatBRL(p.perdas)}
+            value={moneyValueNode(p.perdas)}
           />
         ))}
       </StatSection>
@@ -227,7 +280,7 @@ export function LeagueStatsTextBlocks({
           <LineRow
             key={p.userId}
             label={p.displayName}
-            value={formatBRL(p.lucro)}
+            value={moneyValueNode(p.lucro)}
           />
         ))}
       </StatSection>
