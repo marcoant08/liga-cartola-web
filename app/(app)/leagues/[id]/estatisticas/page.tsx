@@ -111,6 +111,7 @@ export default function LeagueStatsPage() {
       <LeagueStatsTextBlocks
         roundValue={roundValue}
         memberCount={members.length}
+        members={members}
         players={seasonStats.players}
         winnerByRound={seasonStats.winnerByRound}
         lastRound={seasonStats.lastRound}

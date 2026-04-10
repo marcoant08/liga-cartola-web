@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { Round } from "@/lib/types/api";
+import type { LeagueMember, Round } from "@/lib/types/api";
 import { SEASON_TOTAL_ROUNDS, formatBRL, type SeasonPlayerLine } from "@/lib/stats";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -37,6 +37,7 @@ function LineRow({ label, value }: { label: string; value: ReactNode }) {
 type Props = {
   roundValue: number;
   memberCount: number;
+  members: LeagueMember[];
   players: SeasonPlayerLine[];
   winnerByRound: Map<number, string>;
   lastRound: Round | null;
@@ -45,11 +46,17 @@ type Props = {
 export function LeagueStatsTextBlocks({
   roundValue,
   memberCount,
+  members,
   players,
   winnerByRound,
   lastRound,
 }: Props) {
   const podium = players.slice(0, 3);
+  const membersByTeam = [...members].sort((a, b) => {
+    const ta = (a.teamName?.trim() || a.userName).toLowerCase();
+    const tb = (b.teamName?.trim() || b.userName).toLowerCase();
+    return ta.localeCompare(tb, "pt-BR");
+  });
 
   return (
     <>
@@ -66,6 +73,25 @@ export function LeagueStatsTextBlocks({
                 </span>
               </li>
             ))}
+          </ul>
+        )}
+      </StatSection>
+
+      <StatSection title="👥 Dono de cada time">
+        {membersByTeam.length === 0 ? (
+          <p className="text-zinc-500">Nenhum membro na liga.</p>
+        ) : (
+          <ul className="space-y-2">
+            {membersByTeam.map((m) => {
+              const nomeTime = (m.teamName?.trim() || m.userName || "—").trim();
+              return (
+                <li key={m.userId}>
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">{nomeTime}</span>
+                  <span className="text-zinc-500"> → </span>
+                  <span>{m.userName}</span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </StatSection>
@@ -109,7 +135,7 @@ export function LeagueStatsTextBlocks({
             {players.map((p) => (
               <li key={p.userId}>
                 <span className="font-medium">{p.displayName}</span>
-                {" ➡️ "}
+                {" → "}
                 {p.roundsWon.length > 0 ? p.roundsWon.join(", ") : "❌"}
               </li>
             ))}
@@ -121,24 +147,26 @@ export function LeagueStatsTextBlocks({
         {players.map((p) => (
           <LineRow
             key={p.userId}
-            label={`${p.displayName} ➡️`}
+            label={p.displayName}
             value={String(p.wins)}
           />
         ))}
       </StatSection>
 
       <StatSection title="🔄 Vencedores das rodadas">
-        <ul className="space-y-1 font-mono text-xs sm:text-sm">
-          {Array.from({ length: SEASON_TOTAL_ROUNDS }, (_, i) => {
-            const num = i + 1;
-            const name = winnerByRound.get(num);
-            return (
-              <li key={num}>
-                {pad2(num)}: {name ? `${name};` : "—"}
-              </li>
-            );
-          })}
-        </ul>
+        {winnerByRound.size === 0 ? (
+          <p className="text-zinc-500">Nenhuma rodada com vencedor registrado.</p>
+        ) : (
+          <ul className="space-y-1 font-mono text-xs sm:text-sm">
+            {[...winnerByRound.entries()]
+              .sort((a, b) => a[0] - b[0])
+              .map(([num, name]) => (
+                <li key={num}>
+                  {pad2(num)}: {name};
+                </li>
+              ))}
+          </ul>
+        )}
       </StatSection>
 
       <StatSection title="➗ Percentual de vitórias">
