@@ -122,7 +122,12 @@ export default function LeagueStatsPage() {
 
       <div className="mt-12">
         <h2 className="mb-4 text-lg font-semibold">Gráficos</h2>
-        <LeagueStatsCharts rounds={rounds} roundValue={roundValue} members={members} />
+        <LeagueStatsCharts
+          rounds={rounds}
+          roundValue={roundValue}
+          members={members}
+          players={seasonStats.players}
+        />
       </div>
     </div>
   );
