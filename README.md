@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Liga Cartola — Web
 
-## Getting Started
+Front-end em [Next.js](https://nextjs.org) para a API do repositório **liga-cartola-server** (NestJS + MongoDB).
 
-First, run the development server:
+## Pré-requisitos
+
+- Node.js 20+
+- API rodando (por padrão `http://localhost:3000`)
+- MongoDB configurado no servidor
+
+## Configuração
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.local.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ajuste `NEXT_PUBLIC_API_URL` se a API não estiver em `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Desenvolvimento
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+O app sobe na porta **3001** para não conflitar com o Nest na 3000.
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Abra [http://localhost:3001](http://localhost:3001).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Build
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run build
+npm start
+```
 
-## Deploy on Vercel
+## Funcionalidades
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Cadastro, verificação de e-mail, login (JWT access + refresh)
+- Ligas: listar, criar, detalhe, entrar por convite, admin (editar, convite, convidado, remover membro, registrar rodada)
+- Perfil do usuário
+- Página de **estatísticas** por liga (ranking, prêmio estimado, gráficos com Recharts)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Nota:** Se o envio de e-mail de verificação estiver desligado no servidor, use o código gravado no MongoDB ou ative o serviço de e-mail no backend.
