@@ -2,10 +2,18 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LeagueStatsCharts } from "@/components/league-stats-charts";
+import { LeagueStatsTextBlocks } from "@/components/league-stats-text-blocks";
 import { leaguesApi } from "@/lib/api/leagues";
-import { aggregateWinnerStats } from "@/lib/stats";
+import {
+  aggregateWinnerStats,
+  buildWinnerByRound,
+  computeSeasonPlayerLines,
+  getLastRegisteredRound,
+  SEASON_TOTAL_ROUNDS,
+} from "@/lib/stats";
 
 export default function LeagueStatsPage() {
   const params = useParams();
@@ -15,6 +23,39 @@ export default function LeagueStatsPage() {
     queryKey: ["league", id],
     queryFn: () => leaguesApi.get(id),
   });
+
+  const seasonStats = useMemo(() => {
+    if (!league) {
+      return {
+        players: [] as ReturnType<typeof computeSeasonPlayerLines>,
+        winnerByRound: new Map<number, string>(),
+        lastRound: null as ReturnType<typeof getLastRegisteredRound>,
+      };
+    }
+    const members = league.members ?? [];
+    const rounds = league.rounds ?? [];
+    const roundValue = Number(league.roundValue);
+    return {
+      players: computeSeasonPlayerLines(members, rounds, roundValue),
+      winnerByRound: buildWinnerByRound(rounds),
+      lastRound: getLastRegisteredRound(rounds),
+    };
+  }, [league]);
+
+  const ranking = useMemo(() => {
+    if (!league) return [];
+    return aggregateWinnerStats(
+      league.rounds ?? [],
+      Number(league.roundValue),
+      league.members ?? [],
+    );
+  }, [league]);
+
+  const members = league?.members ?? [];
+  const rounds = league?.rounds ?? [];
+  const roundValue = Number(league?.roundValue ?? 0);
+  const leader = ranking[0];
+  const totalRounds = rounds.length;
 
   if (isLoading) {
     return <p className="text-zinc-500">Carregando estatísticas…</p>;
@@ -28,11 +69,6 @@ export default function LeagueStatsPage() {
     );
   }
 
-  const rounds = league.rounds ?? [];
-  const ranking = aggregateWinnerStats(rounds, league.roundValue, league.members ?? []);
-  const leader = ranking[0];
-  const totalRounds = rounds.length;
-
   return (
     <div>
       <Link
@@ -42,11 +78,17 @@ export default function LeagueStatsPage() {
         ← Voltar à liga
       </Link>
       <h1 className="mt-4 text-2xl font-semibold">Estatísticas — {league.name}</h1>
-      <p className="mt-1 text-sm text-zinc-500">
-        Valor da rodada: <strong>R$ {Number(league.roundValue).toFixed(2)}</strong>. O “total estimado em
-        prêmios” considera <strong>vitórias × valor da rodada</strong> (não inclui pagamentos entre
-        participantes).
-      </p>
+      <div className="mt-2 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p>
+          Valor da rodada: <strong>R$ {roundValue.toFixed(2)}</strong> · {members.length} participante
+          {members.length === 1 ? "" : "s"}.
+        </p>
+        <p>
+          Percentuais e fluxo financeiro (recebimentos, perdas, lucros) usam <strong>{SEASON_TOTAL_ROUNDS} rodadas</strong>{" "}
+          do campeonato e o rateio <strong>valor da rodada ÷ número de participantes</strong> nas rodadas em que o
+          jogador não vence.
+        </p>
+      </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
@@ -59,55 +101,24 @@ export default function LeagueStatsPage() {
           <p className="text-sm text-zinc-500">{leader ? `${leader.wins} vitória(s)` : ""}</p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Maior prêmio estimado</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Maior prêmio (vitórias × rodada)</p>
           <p className="mt-1 text-2xl font-semibold">
             {leader ? `R$ ${leader.estimatedPrize.toFixed(2)}` : "—"}
           </p>
         </div>
       </div>
 
-      <div className="mt-10">
-        <h2 className="mb-3 text-lg font-semibold">Ranking</h2>
-        <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full min-w-[480px] text-left text-sm">
-            <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/80">
-              <tr>
-                <th className="px-4 py-3 font-medium">Participante</th>
-                <th className="px-4 py-3 font-medium">Vitórias</th>
-                <th className="px-4 py-3 font-medium">Total estimado em prêmios</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranking.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-4 py-6 text-center text-zinc-500">
-                    Nenhuma rodada ainda.
-                  </td>
-                </tr>
-              ) : (
-                ranking.map((row) => (
-                  <tr
-                    key={row.winnerId}
-                    className="border-b border-zinc-100 dark:border-zinc-800/80"
-                  >
-                    <td className="px-4 py-3">{row.displayName}</td>
-                    <td className="px-4 py-3">{row.wins}</td>
-                    <td className="px-4 py-3">R$ {row.estimatedPrize.toFixed(2)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <LeagueStatsTextBlocks
+        roundValue={roundValue}
+        memberCount={members.length}
+        players={seasonStats.players}
+        winnerByRound={seasonStats.winnerByRound}
+        lastRound={seasonStats.lastRound}
+      />
 
       <div className="mt-12">
         <h2 className="mb-4 text-lg font-semibold">Gráficos</h2>
-        <LeagueStatsCharts
-          rounds={rounds}
-          roundValue={Number(league.roundValue)}
-          members={league.members ?? []}
-        />
+        <LeagueStatsCharts rounds={rounds} roundValue={roundValue} members={members} />
       </div>
     </div>
   );
