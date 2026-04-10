@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { LeagueMember, Round } from "@/lib/types/api";
-import { SEASON_TOTAL_ROUNDS, formatBRL, type SeasonPlayerLine } from "@/lib/stats";
+import { SEASON_TOTAL_ROUNDS, formatBRL, receiptPerWin, type SeasonPlayerLine } from "@/lib/stats";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -54,6 +54,7 @@ export function LeagueStatsTextBlocks({
   lastRound,
 }: Props) {
   const podium = players.slice(0, 3);
+  const receitaPorVitória = receiptPerWin(memberCount, roundValue);
   const membersByTeam = [...members].sort((a, b) => {
     const ta = (a.teamName?.trim() || a.userName).toLowerCase();
     const tb = (b.teamName?.trim() || b.userName).toLowerCase();
@@ -194,7 +195,7 @@ export function LeagueStatsTextBlocks({
 
       <StatSection title="💰 Recebimentos">
         <p className="mb-3 text-xs text-zinc-500">
-          Vitórias × valor da rodada (R$ {roundValue.toFixed(2)}).
+          {`Por vitória o campeão recebe R$ ${receitaPorVitória.toFixed(2)} = (${memberCount} − 1) × R$ ${roundValue.toFixed(2)} (cada perdedor paga R$ ${roundValue.toFixed(2)}). Total = vitórias × esse valor.`}
         </p>
         {players.map((p) => (
           <LineRow
@@ -207,8 +208,7 @@ export function LeagueStatsTextBlocks({
 
       <StatSection title="💸 Perdas">
         <p className="mb-3 text-xs text-zinc-500">
-          −({SEASON_TOTAL_ROUNDS} − vitórias) × (valor da rodada ÷ {memberCount} participante
-          {memberCount === 1 ? "" : "s"}) = contribuição nas rodadas em que não venceu.
+          {`Em cada uma das ${SEASON_TOTAL_ROUNDS} rodadas em que não venceu, paga R$ ${roundValue.toFixed(2)} ao campeão: −(${SEASON_TOTAL_ROUNDS} − vitórias) × R$ ${roundValue.toFixed(2)}.`}
         </p>
         {players.map((p) => (
           <LineRow

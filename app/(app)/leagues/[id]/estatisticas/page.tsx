@@ -84,9 +84,9 @@ export default function LeagueStatsPage() {
           {members.length === 1 ? "" : "s"}.
         </p>
         <p>
-          Percentuais e fluxo financeiro (recebimentos, perdas, lucros) usam <strong>{SEASON_TOTAL_ROUNDS} rodadas</strong>{" "}
-          do campeonato e o rateio <strong>valor da rodada ÷ número de participantes</strong> nas rodadas em que o
-          jogador não vence.
+          O <strong>valor da rodada</strong> é o que cada <strong>perdedor</strong> paga ao campeão. O campeão
+          recebe <strong>(participantes − 1) × valor da rodada</strong> por vitória. Perdas e lucros projetam as{" "}
+          <strong>{SEASON_TOTAL_ROUNDS} rodadas</strong> do campeonato.
         </p>
       </div>
 
@@ -101,7 +101,9 @@ export default function LeagueStatsPage() {
           <p className="text-sm text-zinc-500">{leader ? `${leader.wins} vitória(s)` : ""}</p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Maior prêmio (vitórias × rodada)</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Maior recebimento (vitórias × (n − 1) × valor)
+          </p>
           <p className="mt-1 text-2xl font-semibold">
             {leader ? `R$ ${leader.estimatedPrize.toFixed(2)}` : "—"}
           </p>

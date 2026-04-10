@@ -17,7 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import type { LeagueMember, Round } from "@/lib/types/api";
-import { aggregateWinnerStats, roundsSorted } from "@/lib/stats";
+import { aggregateWinnerStats, receiptPerWin, roundsSorted } from "@/lib/stats";
 
 const COLORS = [
   "#059669",
@@ -60,19 +60,24 @@ export function LeagueStatsCharts({ rounds, roundValue, members }: Props) {
     }));
   }, [ranking, rounds.length]);
 
+  const prizePerWin = useMemo(
+    () => receiptPerWin(members.length, roundValue),
+    [members.length, roundValue],
+  );
+
   const cumulativeByLeader = useMemo(() => {
     const sorted = roundsSorted(rounds);
     if (sorted.length === 0 || ranking.length === 0) return [];
     const leaderId = ranking[0].winnerId;
     let acc = 0;
     return sorted.map((r) => {
-      if (r.winnerId === leaderId) acc += roundValue;
+      if (r.winnerId === leaderId) acc += prizePerWin;
       return {
         rodada: r.roundNumber,
         acumuladoLíder: acc,
       };
     });
-  }, [rounds, roundValue, ranking]);
+  }, [rounds, prizePerWin, ranking]);
 
   if (rounds.length === 0) {
     return (
@@ -135,7 +140,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members }: Props) {
         <div>
           <h2 className="mb-2 text-lg font-semibold">Prêmio acumulado do líder em vitórias</h2>
           <p className="mb-2 text-xs text-zinc-500">
-            Soma do valor da rodada ({`R$ ${roundValue.toFixed(2)}`}) apenas nas rodadas em que o líder venceu.
+            {`Por vitória: (${members.length} − 1) × R$ ${roundValue.toFixed(2)} = R$ ${prizePerWin.toFixed(2)} dos demais (cada perdedor paga R$ ${roundValue.toFixed(2)} ao campeão). Acumulado só nas rodadas em que o líder venceu.`}
           </p>
           <div className="h-72 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
             <ResponsiveContainer width="100%" height="100%">

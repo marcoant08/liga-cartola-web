@@ -7,7 +7,18 @@ export type WinnerStatsRow = {
   estimatedPrize: number;
 };
 
-/** Prêmio estimado = vitórias × valor da rodada (convenção do produto). */
+/**
+ * Por vitória, o campeão recebe `roundValue` de cada um dos (n − 1) que perderam
+ * (ele não paga a si mesmo).
+ */
+export function receiptPerWin(memberCount: number, roundValue: number): number {
+  const n = memberCount;
+  const rv = Number(roundValue);
+  if (n < 2 || !Number.isFinite(rv) || rv <= 0) return 0;
+  return (n - 1) * rv;
+}
+
+/** Recebimento estimado = vitórias × (participantes − 1) × valor da rodada. */
 export function aggregateWinnerStats(
   rounds: Round[],
   roundValue: number,
@@ -15,6 +26,7 @@ export function aggregateWinnerStats(
 ): WinnerStatsRow[] {
   const teamByUserId = new Map(members.map((m) => [m.userId, m.teamName]));
   const byWinner = new Map<string, { displayName: string; wins: number }>();
+  const perWin = receiptPerWin(members.length, roundValue);
 
   for (const r of rounds) {
     const fromMember = teamByUserId.get(r.winnerId);
@@ -31,7 +43,7 @@ export function aggregateWinnerStats(
       winnerId,
       displayName: v.displayName,
       wins: v.wins,
-      estimatedPrize: v.wins * roundValue,
+      estimatedPrize: v.wins * perWin,
     }))
     .sort((a, b) => b.wins - a.wins);
 }
@@ -64,10 +76,11 @@ export function formatBRL(value: number): string {
 }
 
 /**
- * Modelo alinhado ao exemplo do produto:
- * - Pote por rodada = valor da rodada da liga; quem não vence paga (valor / n) por rodada em que não ganhou.
- * - Recebimentos = vitórias × valor da rodada.
- * - Perdas = -(38 − vitórias) × (valor / n).
+ * Fluxo financeiro (38 rodadas do campeonato):
+ * - Por vitória: campeão recebe (n − 1) × valor da rodada (cada perdedor paga esse valor).
+ * - Em cada rodada em que não vence: paga `valor da rodada` ao campeão.
+ * - Recebimentos = vitórias × (n − 1) × valor da rodada.
+ * - Perdas = −(38 − vitórias) × valor da rodada.
  * - Lucro = recebimentos + perdas.
  */
 export function computeSeasonPlayerLines(
@@ -79,7 +92,7 @@ export function computeSeasonPlayerLines(
   const rv = Number(roundValue);
   if (n === 0 || !Number.isFinite(rv) || rv <= 0) return [];
 
-  const contribPerRoundPerPlayer = rv / n;
+  const perWin = receiptPerWin(n, rv);
   const winsByUser = new Map<string, number>();
   const roundsWonByUser = new Map<string, number[]>();
 
@@ -100,8 +113,8 @@ export function computeSeasonPlayerLines(
     const wins = winsByUser.get(m.userId) ?? 0;
     const roundsWon = roundsWonByUser.get(m.userId) ?? [];
     const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
-    const recebimentos = wins * rv;
-    const perdas = -(SEASON_TOTAL_ROUNDS - wins) * contribPerRoundPerPlayer;
+    const recebimentos = wins * perWin;
+    const perdas = -(SEASON_TOTAL_ROUNDS - wins) * rv;
     const lucro = recebimentos + perdas;
     const pctVitórias =
       registeredRounds > 0 ? (wins / registeredRounds) * 100 : 0;
