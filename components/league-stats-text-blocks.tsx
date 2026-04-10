@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { LeagueMember, Round } from "@/lib/types/api";
-import { SEASON_TOTAL_ROUNDS, formatBRL, receiptPerWin, type SeasonPlayerLine } from "@/lib/stats";
+import { formatBRL, receiptPerWin, type SeasonPlayerLine } from "@/lib/stats";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -187,7 +187,7 @@ export function LeagueStatsTextBlocks({
         {players.map((p) => (
           <LineRow
             key={p.userId}
-            label={`${p.displayName} ➡️`}
+            label={p.displayName}
             value={`${p.pctVitórias.toFixed(1)}%`}
           />
         ))}
@@ -200,7 +200,7 @@ export function LeagueStatsTextBlocks({
         {players.map((p) => (
           <LineRow
             key={p.userId}
-            label={`${p.displayName} ➡️`}
+            label={p.displayName}
             value={formatBRL(p.recebimentos)}
           />
         ))}
@@ -208,12 +208,14 @@ export function LeagueStatsTextBlocks({
 
       <StatSection title="💸 Perdas">
         <p className="mb-3 text-xs text-zinc-500">
-          {`Em cada uma das ${SEASON_TOTAL_ROUNDS} rodadas em que não venceu, paga R$ ${roundValue.toFixed(2)} ao campeão: −(${SEASON_TOTAL_ROUNDS} − vitórias) × R$ ${roundValue.toFixed(2)}.`}
+          {registeredRoundsCount === 0
+            ? "Sem rodadas registradas — sem perdas contabilizadas."
+            : `Só entram rodadas já registradas (${registeredRoundsCount}). Em cada uma em que não venceu, paga R$ ${roundValue.toFixed(2)} ao campeão: −(${registeredRoundsCount} − vitórias) × R$ ${roundValue.toFixed(2)}.`}
         </p>
         {players.map((p) => (
           <LineRow
             key={p.userId}
-            label={`${p.displayName} ➡️`}
+            label={p.displayName}
             value={formatBRL(p.perdas)}
           />
         ))}
@@ -224,7 +226,7 @@ export function LeagueStatsTextBlocks({
         {players.map((p) => (
           <LineRow
             key={p.userId}
-            label={`${p.displayName} ➡️`}
+            label={p.displayName}
             value={formatBRL(p.lucro)}
           />
         ))}

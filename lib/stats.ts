@@ -76,11 +76,11 @@ export function formatBRL(value: number): string {
 }
 
 /**
- * Fluxo financeiro (38 rodadas do campeonato):
+ * Fluxo financeiro (somente rodadas já registradas na liga):
  * - Por vitória: campeão recebe (n − 1) × valor da rodada (cada perdedor paga esse valor).
- * - Em cada rodada em que não vence: paga `valor da rodada` ao campeão.
+ * - Em cada rodada registrada em que não venceu: paga `valor da rodada` ao campeão.
  * - Recebimentos = vitórias × (n − 1) × valor da rodada.
- * - Perdas = −(38 − vitórias) × valor da rodada.
+ * - Perdas = −(rodadas registradas − vitórias) × valor da rodada.
  * - Lucro = recebimentos + perdas.
  */
 export function computeSeasonPlayerLines(
@@ -114,7 +114,8 @@ export function computeSeasonPlayerLines(
     const roundsWon = roundsWonByUser.get(m.userId) ?? [];
     const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
     const recebimentos = wins * perWin;
-    const perdas = -(SEASON_TOTAL_ROUNDS - wins) * rv;
+    const perdas =
+      registeredRounds > 0 ? -(registeredRounds - wins) * rv : 0;
     const lucro = recebimentos + perdas;
     const pctVitórias =
       registeredRounds > 0 ? (wins / registeredRounds) * 100 : 0;

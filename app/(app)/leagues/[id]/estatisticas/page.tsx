@@ -12,7 +12,6 @@ import {
   buildWinnerByRound,
   computeSeasonPlayerLines,
   getLastRegisteredRound,
-  SEASON_TOTAL_ROUNDS,
 } from "@/lib/stats";
 
 export default function LeagueStatsPage() {
@@ -85,8 +84,9 @@ export default function LeagueStatsPage() {
         </p>
         <p>
           O <strong>valor da rodada</strong> é o que cada <strong>perdedor</strong> paga ao campeão. O campeão
-          recebe <strong>(participantes − 1) × valor da rodada</strong> por vitória. Perdas e lucros projetam as{" "}
-          <strong>{SEASON_TOTAL_ROUNDS} rodadas</strong> do campeonato.
+          recebe <strong>(participantes − 1) × valor da rodada</strong> por vitória. <strong>Perdas</strong> e{" "}
+          <strong>lucros</strong> consideram apenas as rodadas <strong>já registradas</strong> na liga. O
+          percentual de vitórias também usa só essas rodadas.
         </p>
       </div>
 
