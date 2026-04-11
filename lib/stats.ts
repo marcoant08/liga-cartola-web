@@ -158,3 +158,40 @@ export function getLastRegisteredRound(rounds: Round[]): Round | null {
     return t >= bt ? r : best;
   });
 }
+
+/** Por jogador: quantas rodadas **já registradas** seguem desde a mais recente (maior número de rodada) até a última em que foi campeão. Quem nunca venceu conta todas as rodadas registradas. */
+export type WinDroughtRow = {
+  userId: string;
+  displayName: string;
+  roundsSinceLastWin: number;
+};
+
+export function computeRoundsSinceLastWin(
+  members: LeagueMember[],
+  rounds: Round[],
+): WinDroughtRow[] {
+  if (members.length === 0) return [];
+  const sorted = roundsSorted(rounds);
+
+  const rows: WinDroughtRow[] = members.map((m) => {
+    const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
+    if (sorted.length === 0) {
+      return { userId: m.userId, displayName, roundsSinceLastWin: 0 };
+    }
+    let count = 0;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].winnerId === m.userId) break;
+      count++;
+    }
+    return { userId: m.userId, displayName, roundsSinceLastWin: count };
+  });
+
+  rows.sort((a, b) => {
+    if (b.roundsSinceLastWin !== a.roundsSinceLastWin) {
+      return b.roundsSinceLastWin - a.roundsSinceLastWin;
+    }
+    return a.displayName.localeCompare(b.displayName, "pt-BR");
+  });
+
+  return rows;
+}

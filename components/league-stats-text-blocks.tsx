@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useMemo } from "react";
 import type { LeagueMember, Round } from "@/lib/types/api";
-import { formatBRL, receiptPerWin, type SeasonPlayerLine } from "@/lib/stats";
+import { computeRoundsSinceLastWin, formatBRL, receiptPerWin, type SeasonPlayerLine } from "@/lib/stats";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -59,10 +60,24 @@ function moneyValueNode(value: number): ReactNode {
   return text;
 }
 
+/** Texto do card «Mais rodadas sem vencer»: jejum numérico, «Último vencedor» ou «Ainda não venceu». */
+function formatWinDroughtValue(
+  row: { userId: string; roundsSinceLastWin: number },
+  players: SeasonPlayerLine[],
+  registeredRoundsCount: number,
+): string {
+  if (registeredRoundsCount === 0) return "—";
+  const wins = players.find((p) => p.userId === row.userId)?.wins ?? 0;
+  if (wins === 0) return "Ainda não venceu";
+  if (row.roundsSinceLastWin === 0) return "Último vencedor";
+  return `${row.roundsSinceLastWin} rodada${row.roundsSinceLastWin === 1 ? "" : "s"}`;
+}
+
 type Props = {
   roundValue: number;
   memberCount: number;
   members: LeagueMember[];
+  rounds: Round[];
   registeredRoundsCount: number;
   players: SeasonPlayerLine[];
   winnerByRound: Map<number, string>;
@@ -73,11 +88,14 @@ export function LeagueStatsTextBlocks({
   roundValue,
   memberCount,
   members,
+  rounds,
   registeredRoundsCount,
   players,
   winnerByRound,
   lastRound,
 }: Props) {
+  const winDroughtRows = useMemo(() => computeRoundsSinceLastWin(members, rounds), [members, rounds]);
+
   const podium = players.slice(0, 3);
   const receitaPorVitória = receiptPerWin(memberCount, roundValue);
   const membersByTeam = [...members].sort((a, b) => {
@@ -207,6 +225,29 @@ export function LeagueStatsTextBlocks({
               </li>
             ))}
           </ul>
+        )}
+      </StatSection>
+
+      <StatSection title="Mais rodadas sem vencer">
+        <StatIntro>
+          {registeredRoundsCount === 0 ? (
+            <>Sem rodadas cadastradas — todos com 0.</>
+          ) : (
+            <>
+              Número de rodadas desde a última vitória.
+            </>
+          )}
+        </StatIntro>
+        {members.length === 0 ? (
+          <p className="py-1.5 text-zinc-500">Nenhum membro na liga.</p>
+        ) : (
+          winDroughtRows.map((row) => (
+            <LineRow
+              key={row.userId}
+              label={row.displayName}
+              value={formatWinDroughtValue(row, players, registeredRoundsCount)}
+            />
+          ))
         )}
       </StatSection>
 

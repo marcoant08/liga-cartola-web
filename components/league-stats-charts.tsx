@@ -19,7 +19,7 @@ import {
   type BarShapeProps,
 } from "recharts";
 import type { LeagueMember, Round } from "@/lib/types/api";
-import { aggregateWinnerStats, type SeasonPlayerLine } from "@/lib/stats";
+import { aggregateWinnerStats, computeRoundsSinceLastWin, type SeasonPlayerLine } from "@/lib/stats";
 
 const COLORS = [
   "#059669",
@@ -86,6 +86,7 @@ const shapeVitórias = makeVerticalBarShape("#059669");
 const shapeGanhos = makeVerticalBarShape("#059669");
 const shapePerdas = makeVerticalBarShape("#dc2626");
 const shapeLucro = makeVerticalBarShape("#059669");
+const shapeJejum = makeVerticalBarShape("#d97706");
 
 type Props = {
   rounds: Round[];
@@ -117,6 +118,15 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
       value: r.wins,
     }));
   }, [ranking, rounds.length]);
+
+  const droughtBarData = useMemo(
+    () =>
+      computeRoundsSinceLastWin(members, rounds).map((r) => ({
+        nome: shortLabel(r.displayName),
+        jejum: r.roundsSinceLastWin,
+      })),
+    [members, rounds],
+  );
 
   const top5Ganhos = useMemo(
     () =>
@@ -182,6 +192,43 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
           financeiros usam só as rodadas já cadastradas (neste momento, zeros).
         </p>
       ) : null}
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Rodadas sem vencer (desde a última vitória)</h2>
+        <p className="mb-2 text-xs text-zinc-500">
+          Conta só rodadas <strong>já registradas</strong>, da mais recente (maior número de rodada) para trás,
+          até a última em que o jogador foi campeão. Quem nunca venceu acumula todas as rodadas registradas.
+        </p>
+        {rounds.length === 0 ? (
+          <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
+            Sem rodadas registradas ainda.
+          </p>
+        ) : (
+          <div className="h-72 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={droughtBarData} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
+                <XAxis dataKey="nome" angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid var(--color-zinc-200, #e4e4e7)",
+                  }}
+                  formatter={(v) => [`${v} rodada(s)`, "Sem vencer"]}
+                />
+                <Bar
+                  dataKey="jejum"
+                  fill="#d97706"
+                  radius={[4, 4, 0, 0]}
+                  name="Rodadas sem vitória"
+                  shape={shapeJejum}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
 
       <section>
         <h2 className="mb-2 text-lg font-semibold">Vitórias por participante</h2>

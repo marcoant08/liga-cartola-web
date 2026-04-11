@@ -12,6 +12,7 @@ import { leagueAccessErrorMessage } from "@/lib/league-access-error";
 import {
   aggregateWinnerStats,
   buildWinnerByRound,
+  computeRoundsSinceLastWin,
   computeSeasonPlayerLines,
   getLastRegisteredRound,
 } from "@/lib/stats";
@@ -53,11 +54,17 @@ export default function LeagueStatsPage() {
     );
   }, [league]);
 
+  const winDroughtRows = useMemo(() => {
+    if (!league) return [];
+    return computeRoundsSinceLastWin(league.members ?? [], league.rounds ?? []);
+  }, [league]);
+
   const members = league?.members ?? [];
   const rounds = league?.rounds ?? [];
   const roundValue = Number(league?.roundValue ?? 0);
   const leader = ranking[0];
   const totalRounds = rounds.length;
+  const worstDrought = winDroughtRows[0];
 
   if (isLoading) {
     return <p className="text-zinc-500">Carregando estatísticas…</p>;
@@ -120,7 +127,7 @@ export default function LeagueStatsPage() {
         </p>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Rodadas registradas</p>
           <p className="mt-1 text-2xl font-semibold">{totalRounds}</p>
@@ -138,12 +145,40 @@ export default function LeagueStatsPage() {
             {leader ? `R$ ${leader.estimatedPrize.toFixed(2)}` : "—"}
           </p>
         </div>
+        <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 p-4 dark:border-amber-900/50 dark:bg-amber-950/25">
+          <p className="text-xs font-medium uppercase tracking-wide text-amber-900/80 dark:text-amber-200/90">
+            Maior jejum sem vitória
+          </p>
+          {totalRounds === 0 ? (
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Ainda não há rodadas registradas.</p>
+          ) : members.length === 0 ? (
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Sem participantes na liga.</p>
+          ) : worstDrought ? (
+            <>
+              <p className="mt-1 text-2xl font-semibold text-amber-950 dark:text-amber-50">
+                {worstDrought.roundsSinceLastWin}{" "}
+                <span className="text-lg font-medium text-amber-900/90 dark:text-amber-100/90">
+                  rodada{worstDrought.roundsSinceLastWin === 1 ? "" : "s"}
+                </span>
+              </p>
+              <p className="mt-1 truncate text-sm font-medium text-amber-950 dark:text-amber-100">
+                {worstDrought.displayName}
+              </p>
+              <p className="mt-2 text-xs text-amber-900/75 dark:text-amber-200/80">
+                Rodadas já registradas, da mais recente até a última vitória deste jogador.
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">—</p>
+          )}
+        </div>
       </div>
 
       <LeagueStatsTextBlocks
         roundValue={roundValue}
         memberCount={members.length}
         members={members}
+        rounds={rounds}
         registeredRoundsCount={rounds.length}
         players={seasonStats.players}
         winnerByRound={seasonStats.winnerByRound}
