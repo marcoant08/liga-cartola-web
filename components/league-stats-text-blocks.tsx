@@ -10,6 +10,10 @@ function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+/** Linha divisória entre itens (igual ao separador dos cards com label/valor). */
+const STAT_ROW_LINE =
+  "border-b border-zinc-100 py-1.5 last:border-b-0 dark:border-zinc-800/80";
+
 function StatSection({
   title,
   children,
@@ -20,14 +24,23 @@ function StatSection({
   return (
     <section className="mt-10 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{title}</h2>
-      <div className="mt-4 space-y-2 text-sm text-zinc-800 dark:text-zinc-200">{children}</div>
+      <div className="mt-4 text-sm text-zinc-800 dark:text-zinc-200">{children}</div>
     </section>
+  );
+}
+
+/** Texto explicativo no topo do card, com linha abaixo alinhada às demais linhas. */
+function StatIntro({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-3 border-b border-zinc-100 pb-3 text-xs text-zinc-500 dark:border-zinc-800/80 dark:text-zinc-400">
+      {children}
+    </div>
   );
 }
 
 function LineRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2 border-b border-zinc-100 py-1.5 last:border-0 dark:border-zinc-800/80">
+    <div className={`flex flex-wrap items-baseline gap-x-2 ${STAT_ROW_LINE}`}>
       <span className="min-w-0 flex-1 font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
       <span className="shrink-0 tabular-nums text-zinc-900 dark:text-zinc-100">{value}</span>
     </div>
@@ -94,11 +107,11 @@ export function LeagueStatsTextBlocks({
     <>
       <StatSection title="🥇 Pódio">
         {podium.length === 0 ? (
-          <p className="text-zinc-500">Sem dados de vitórias ainda.</p>
+          <p className="py-1.5 text-zinc-500">Sem dados de vitórias ainda.</p>
         ) : (
-          <ul className="list-none space-y-2">
+          <ul className="list-none">
             {podium.map((p, i) => (
-              <li key={p.userId} className="text-base">
+              <li key={p.userId} className={`text-base ${STAT_ROW_LINE}`}>
                 {MEDALS[i]}{" "}
                 <span className="font-medium">
                   {p.displayName} ({pad2(p.wins)} vitória{p.wins === 1 ? "" : "s"})
@@ -111,13 +124,13 @@ export function LeagueStatsTextBlocks({
 
       <StatSection title="👥 Dono de cada time">
         {membersByTeam.length === 0 ? (
-          <p className="text-zinc-500">Nenhum membro na liga.</p>
+          <p className="py-1.5 text-zinc-500">Nenhum membro na liga.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="list-none">
             {membersByTeam.map((m) => {
               const nomeTime = (m.teamName?.trim() || m.userName || "—").trim();
               return (
-                <li key={m.userId}>
+                <li key={m.userId} className={STAT_ROW_LINE}>
                   <span className="font-medium text-zinc-900 dark:text-zinc-100">{nomeTime}</span>
                   <span className="text-zinc-500"> → </span>
                   <span>{m.userName}</span>
@@ -130,27 +143,33 @@ export function LeagueStatsTextBlocks({
 
       <StatSection title="🔄 Rodada atual">
         {lastRound ? (
-          <>
-            <p className="font-medium">Estatísticas da rodada {lastRound.roundNumber}</p>
-            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-              Último campeão registrado: <strong>{lastRound.winnerName}</strong>
-            </p>
-            <p className="text-xs text-zinc-500">
-              Registrado em {new Date(lastRound.registeredAt).toLocaleString("pt-BR")}
-            </p>
-          </>
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+            <div className="py-1.5">
+              <p className="font-medium">Estatísticas da rodada {lastRound.roundNumber}</p>
+            </div>
+            <div className="py-1.5">
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Último campeão registrado: <strong>{lastRound.winnerName}</strong>
+              </p>
+            </div>
+            <div className="py-1.5">
+              <p className="text-xs text-zinc-500">
+                Registrado em {new Date(lastRound.registeredAt).toLocaleString("pt-BR")}
+              </p>
+            </div>
+          </div>
         ) : (
-          <p className="text-zinc-500">Nenhuma rodada registrada na liga ainda.</p>
+          <p className="py-1.5 text-zinc-500">Nenhuma rodada registrada na liga ainda.</p>
         )}
       </StatSection>
 
       <StatSection title="👤 Jogadores">
         {players.length === 0 ? (
-          <p className="text-zinc-500">Nenhum membro na liga.</p>
+          <p className="py-1.5 text-zinc-500">Nenhum membro na liga.</p>
         ) : (
-          <ol className="list-none space-y-1">
+          <ol className="list-none">
             {players.map((p, idx) => (
-              <li key={p.userId}>
+              <li key={p.userId} className={STAT_ROW_LINE}>
                 <span className="tabular-nums text-zinc-500">{pad2(idx + 1)}.</span>{" "}
                 {p.displayName}
               </li>
@@ -159,13 +178,29 @@ export function LeagueStatsTextBlocks({
         )}
       </StatSection>
 
+      <StatSection title="🔄 Vencedores das rodadas">
+        {winnerByRound.size === 0 ? (
+          <p className="py-1.5 text-zinc-500">Nenhuma rodada com vencedor registrado.</p>
+        ) : (
+          <ol className="list-none">
+            {[...winnerByRound.entries()]
+              .sort((a, b) => a[0] - b[0])
+              .map(([num, name]) => (
+                <li key={num} className={STAT_ROW_LINE}>
+                  <span className="tabular-nums text-zinc-500">{pad2(num)}.</span> {name}
+                </li>
+              ))}
+          </ol>
+        )}
+      </StatSection>
+
       <StatSection title="📝 Histórico de vitória das rodadas">
         {players.length === 0 ? (
-          <p className="text-zinc-500">—</p>
+          <p className="py-1.5 text-zinc-500">—</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="list-none">
             {players.map((p) => (
-              <li key={p.userId}>
+              <li key={p.userId} className={STAT_ROW_LINE}>
                 <span className="font-medium">{p.displayName}</span>
                 {" → "}
                 {p.roundsWon.length > 0 ? p.roundsWon.join(", ") : "❌"}
@@ -186,7 +221,7 @@ export function LeagueStatsTextBlocks({
       </StatSection>
 
       <StatSection title="❌ Número de derrotas no campeonato">
-        <p className="mb-3 text-xs text-zinc-500">
+        <StatIntro>
           {registeredRoundsCount === 0 ? (
             <>Sem rodadas cadastradas — todos com 0 derrotas.</>
           ) : (
@@ -195,9 +230,9 @@ export function LeagueStatsTextBlocks({
               foi campeão soma 1 derrota (igual a {registeredRoundsCount} − vitórias).
             </>
           )}
-        </p>
+        </StatIntro>
         {players.length === 0 ? (
-          <p className="text-zinc-500">Nenhum membro na liga.</p>
+          <p className="py-1.5 text-zinc-500">Nenhum membro na liga.</p>
         ) : (
           playersByDerrotasDesc.map((p) => (
             <LineRow
@@ -209,24 +244,8 @@ export function LeagueStatsTextBlocks({
         )}
       </StatSection>
 
-      <StatSection title="🔄 Vencedores das rodadas">
-        {winnerByRound.size === 0 ? (
-          <p className="text-zinc-500">Nenhuma rodada com vencedor registrado.</p>
-        ) : (
-          <ul className="space-y-1 font-mono text-xs sm:text-sm">
-            {[...winnerByRound.entries()]
-              .sort((a, b) => a[0] - b[0])
-              .map(([num, name]) => (
-                <li key={num}>
-                  {pad2(num)}: {name};
-                </li>
-              ))}
-          </ul>
-        )}
-      </StatSection>
-
       <StatSection title="➗ Percentual de vitórias">
-        <p className="mb-3 text-xs text-zinc-500">
+        <StatIntro>
           {registeredRoundsCount === 0 ? (
             <>Sem rodadas cadastradas — todos com 0%.</>
           ) : (
@@ -236,7 +255,7 @@ export function LeagueStatsTextBlocks({
               {registeredRoundsCount === 1 ? "" : "s"} (vitórias ÷ {registeredRoundsCount}).
             </>
           )}
-        </p>
+        </StatIntro>
         {players.map((p) => (
           <LineRow
             key={p.userId}
@@ -247,9 +266,9 @@ export function LeagueStatsTextBlocks({
       </StatSection>
 
       <StatSection title="💰 Recebimentos">
-        <p className="mb-3 text-xs text-zinc-500">
+        <StatIntro>
           {`Por vitória o campeão recebe R$ ${receitaPorVitória.toFixed(2)} = (${memberCount} − 1) × R$ ${roundValue.toFixed(2)} (cada perdedor paga R$ ${roundValue.toFixed(2)}). Total = vitórias × esse valor.`}
-        </p>
+        </StatIntro>
         {players.map((p) => (
           <LineRow
             key={p.userId}
@@ -260,11 +279,11 @@ export function LeagueStatsTextBlocks({
       </StatSection>
 
       <StatSection title="💸 Perdas">
-        <p className="mb-3 text-xs text-zinc-500">
+        <StatIntro>
           {registeredRoundsCount === 0
             ? "Sem rodadas registradas — sem perdas contabilizadas."
             : `Só entram rodadas já registradas (${registeredRoundsCount}). Em cada uma em que não venceu, paga R$ ${roundValue.toFixed(2)} ao campeão: −(${registeredRoundsCount} − vitórias) × R$ ${roundValue.toFixed(2)}.`}
-        </p>
+        </StatIntro>
         {playersByPerdasDesc.map((p) => (
           <LineRow
             key={p.userId}
@@ -275,7 +294,7 @@ export function LeagueStatsTextBlocks({
       </StatSection>
 
       <StatSection title="💵 Lucros">
-        <p className="mb-3 text-xs text-zinc-500">Recebimentos + perdas (valores estimados).</p>
+        <StatIntro>Recebimentos + perdas (valores estimados).</StatIntro>
         {players.map((p) => (
           <LineRow
             key={p.userId}
