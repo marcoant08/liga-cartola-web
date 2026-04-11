@@ -54,6 +54,12 @@ export default function LeagueStatsPage() {
     );
   }, [league]);
 
+  const leadersTiedWins = useMemo(() => {
+    if (ranking.length === 0) return [];
+    const maxWins = ranking[0].wins;
+    return ranking.filter((r) => r.wins === maxWins);
+  }, [ranking]);
+
   const winDroughtRows = useMemo(() => {
     if (!league) return [];
     return computeRoundsSinceLastWin(league.members ?? [], league.rounds ?? []);
@@ -138,8 +144,19 @@ export default function LeagueStatsPage() {
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Líder em vitórias</p>
-          <p className="mt-1 truncate text-lg font-semibold">{leader?.displayName ?? "—"}</p>
-          <p className="text-sm text-zinc-500">{leader ? `${leader.wins} vitória(s)` : ""}</p>
+          {leadersTiedWins.length > 0 ? (
+            <>
+              <p className="mt-1 text-lg font-semibold leading-snug text-zinc-900 dark:text-zinc-50">
+                {leadersTiedWins.map((r) => r.displayName).join(" · ")}
+              </p>
+              <p className="text-sm text-zinc-500">
+                {leadersTiedWins[0].wins} vitória{leadersTiedWins[0].wins === 1 ? "" : "s"}
+                {leadersTiedWins.length > 1 ? " (empate)" : ""}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-lg font-semibold">—</p>
+          )}
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
