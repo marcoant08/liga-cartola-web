@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { leaguesApi } from "@/lib/api/leagues";
 import { roundsApi } from "@/lib/api/rounds";
 import { ApiError } from "@/lib/api/error";
+import { leagueAccessErrorMessage } from "@/lib/league-access-error";
 import { roundsSorted } from "@/lib/stats";
 
 export default function LeagueDetailPage() {
@@ -44,6 +45,7 @@ export default function LeagueDetailPage() {
   const [inviteInfo, setInviteInfo] = useState<{ inviteToken: string; expiresAt: string } | null>(
     null,
   );
+  const [copyPublicHint, setCopyPublicHint] = useState<string | null>(null);
 
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -124,6 +126,19 @@ export default function LeagueDetailPage() {
     },
   });
 
+  const updatePublicMutation = useMutation({
+    mutationFn: (nextPublic: boolean) => leaguesApi.update(id, { isPublic: nextPublic }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["league", id] });
+      qc.invalidateQueries({ queryKey: ["leagues"] });
+      setFormError(null);
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) setFormError(err.message);
+      else setFormError("Não foi possível atualizar a visibilidade da liga.");
+    },
+  });
+
   function openEdit() {
     if (!league) return;
     setEditName(league.name);
@@ -141,24 +156,33 @@ export default function LeagueDetailPage() {
   if (error || !league) {
     return (
       <div>
-        <Link href="/" className="text-sm text-emerald-700 hover:underline dark:text-emerald-400">
-          ← Ligas
+        <Link
+          href={user ? "/" : "/login"}
+          className="text-sm text-emerald-700 hover:underline dark:text-emerald-400"
+        >
+          {user ? "← Minhas ligas" : "← Entrar na conta"}
         </Link>
         <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-red-800 dark:bg-red-950/40 dark:text-red-200">
-          Liga não encontrada ou você não tem acesso.
+          {error ? leagueAccessErrorMessage(error) : "Liga não encontrada."}
         </p>
       </div>
     );
   }
 
   const members = league.members ?? [];
+  const isMember = !!(user && members.some((m) => m.userId === user.id));
+  const showPixColumn = isMember;
+  const isPublicLeague = league.isPublic ?? false;
 
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link href="/" className="text-sm text-emerald-700 hover:underline dark:text-emerald-400">
-            ← Minhas ligas
+          <Link
+            href={user ? "/" : "/login"}
+            className="text-sm text-emerald-700 hover:underline dark:text-emerald-400"
+          >
+            {user ? "← Minhas ligas" : "← Entrar na conta"}
           </Link>
           <h1 className="mt-2 text-2xl font-semibold">{league.name}</h1>
           <p className="mt-1 max-w-2xl text-zinc-600 dark:text-zinc-400">{league.description}</p>
@@ -190,6 +214,29 @@ export default function LeagueDetailPage() {
         )}
       </dl>
 
+      {isPublicLeague && !isMember && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+          {!user ? (
+            <p>
+              Vista pública: você vê times e rodadas, mas não chaves Pix nem convites.{" "}
+              <Link href="/login" className="font-medium text-emerald-800 underline dark:text-emerald-300">
+                Entrar
+              </Link>{" "}
+              ou{" "}
+              <Link href="/register" className="font-medium text-emerald-800 underline dark:text-emerald-300">
+                cadastrar-se
+              </Link>{" "}
+              para participar com convite do administrador.
+            </p>
+          ) : (
+            <p>
+              Você não é membro desta liga: os dados sensíveis (Pix, convites) ficam ocultos. Peça um convite ao
+              administrador para entrar.
+            </p>
+          )}
+        </div>
+      )}
+
       {formError && (
         <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">
           {formError}
@@ -199,6 +246,48 @@ export default function LeagueDetailPage() {
       {isAdmin && (
         <section className="mt-10 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="text-lg font-semibold">Administração</h2>
+
+          <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              checked={isPublicLeague}
+              disabled={updatePublicMutation.isPending}
+              onChange={(e) => {
+                setFormError(null);
+                updatePublicMutation.mutate(e.target.checked);
+              }}
+              className="mt-1 rounded border-zinc-300 dark:border-zinc-600"
+            />
+            <span>
+              Liga pública — qualquer pessoa pode ver esta página e as rodadas <strong>sem</strong> estar logada
+              (sem chaves Pix dos membros nem token de convite).
+            </span>
+          </label>
+
+          {isPublicLeague && (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={async () => {
+                  setCopyPublicHint(null);
+                  const url = `${window.location.origin}/leagues/${id}`;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    setCopyPublicHint("Link copiado para a área de transferência.");
+                  } catch {
+                    setCopyPublicHint("Não foi possível copiar automaticamente. Copie o endereço da barra do navegador.");
+                  }
+                  window.setTimeout(() => setCopyPublicHint(null), 3500);
+                }}
+                className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-600 dark:hover:bg-zinc-800"
+              >
+                Copiar link público
+              </button>
+              {copyPublicHint && (
+                <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">{copyPublicHint}</p>
+              )}
+            </div>
+          )}
 
           <div className="mt-4 flex flex-wrap gap-2">
             <button
@@ -395,7 +484,7 @@ export default function LeagueDetailPage() {
             <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/80">
               <tr>
                 <th className="px-4 py-3 font-medium">Nome / time</th>
-                <th className="px-4 py-3 font-medium">Pix</th>
+                {showPixColumn && <th className="px-4 py-3 font-medium">Pix</th>}
                 <th className="px-4 py-3 font-medium">Tipo</th>
                 {isAdmin && <th className="px-4 py-3 font-medium">Ações</th>}
               </tr>
@@ -407,7 +496,7 @@ export default function LeagueDetailPage() {
                     <div className="font-medium">{m.teamName}</div>
                     <div className="text-zinc-500">{m.userName}</div>
                   </td>
-                  <td className="px-4 py-3 text-zinc-600">{m.pixKey}</td>
+                  {showPixColumn && <td className="px-4 py-3 text-zinc-600">{m.pixKey}</td>}
                   <td className="px-4 py-3">{m.isGuest ? "Convidado" : "Cadastrado"}</td>
                   {isAdmin && (
                     <td className="px-4 py-3">

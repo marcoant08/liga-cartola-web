@@ -15,6 +15,7 @@ export const leaguesApi = {
     description: string;
     roundValue: number;
     maxParticipants: number;
+    isPublic: boolean;
   }) {
     return apiFetch<League>("/leagues", {
       method: "POST",
@@ -29,6 +30,7 @@ export const leaguesApi = {
       description?: string;
       roundValue?: number;
       maxParticipants?: number;
+      isPublic?: boolean;
     },
   ) {
     return apiFetch<League>(`/leagues/${id}`, {

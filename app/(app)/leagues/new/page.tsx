@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { RequireAuth } from "@/components/require-auth";
 import { leaguesApi } from "@/lib/api/leagues";
 import { usersApi } from "@/lib/api/users";
 import { ApiError } from "@/lib/api/error";
@@ -21,6 +22,7 @@ function NewLeagueForm({
   const [description, setDescription] = useState("");
   const [roundValue, setRoundValue] = useState("5");
   const [maxParticipants, setMaxParticipants] = useState("10");
+  const [isPublic, setIsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const profileOk =
@@ -33,6 +35,7 @@ function NewLeagueForm({
         description,
         roundValue: Number(roundValue),
         maxParticipants: Number(maxParticipants),
+        isPublic,
       }),
     onSuccess: (league) => {
       qc.invalidateQueries({ queryKey: ["leagues"] });
@@ -101,6 +104,18 @@ function NewLeagueForm({
           />
         </label>
       </div>
+      <label className="flex cursor-pointer items-start gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          checked={isPublic}
+          onChange={(e) => setIsPublic(e.target.checked)}
+          className="mt-1 rounded border-zinc-300 dark:border-zinc-600"
+        />
+        <span>
+          Liga pública — qualquer pessoa pode ver esta liga e as rodadas <strong>sem</strong> estar logada
+          (sem ver chaves Pix nem convites).
+        </span>
+      </label>
       <div className="rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-700 dark:bg-zinc-900/50">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
           Seu cadastro na liga (do perfil, não editável aqui)
@@ -145,7 +160,7 @@ function NewLeagueForm({
   );
 }
 
-export default function NewLeaguePage() {
+function NewLeaguePageContent() {
   const { data: profile, isLoading, isError } = useQuery({
     queryKey: ["profile"],
     queryFn: () => usersApi.getProfile(),
@@ -177,5 +192,13 @@ export default function NewLeaguePage() {
         />
       )}
     </div>
+  );
+}
+
+export default function NewLeaguePage() {
+  return (
+    <RequireAuth>
+      <NewLeaguePageContent />
+    </RequireAuth>
   );
 }

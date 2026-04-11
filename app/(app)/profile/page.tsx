@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { RequireAuth } from "@/components/require-auth";
 import { useAuth } from "@/contexts/auth-context";
 import { usersApi } from "@/lib/api/users";
 import { ApiError } from "@/lib/api/error";
@@ -99,7 +100,7 @@ function ProfileForm({
   );
 }
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const { refreshUser } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ["profile"],
@@ -125,5 +126,13 @@ export default function ProfilePage() {
         onSaved={refreshUser}
       />
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <RequireAuth>
+      <ProfilePageContent />
+    </RequireAuth>
   );
 }

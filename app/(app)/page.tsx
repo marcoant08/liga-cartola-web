@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { RequireAuth } from "@/components/require-auth";
 import { leaguesApi } from "@/lib/api/leagues";
 
-export default function HomePage() {
+function HomePageContent() {
   const { data: leagues, isLoading, error } = useQuery({
     queryKey: ["leagues"],
     queryFn: () => leaguesApi.list(),
@@ -95,5 +96,13 @@ export default function HomePage() {
         ))}
       </ul>
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <RequireAuth>
+      <HomePageContent />
+    </RequireAuth>
   );
 }

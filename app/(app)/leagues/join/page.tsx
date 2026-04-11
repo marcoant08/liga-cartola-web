@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { RequireAuth } from "@/components/require-auth";
 import { leaguesApi } from "@/lib/api/leagues";
 import { ApiError } from "@/lib/api/error";
 
-export default function JoinLeaguePage() {
+function JoinLeaguePageContent() {
   const router = useRouter();
   const qc = useQueryClient();
   const [inviteToken, setInviteToken] = useState("");
@@ -94,5 +95,13 @@ export default function JoinLeaguePage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function JoinLeaguePage() {
+  return (
+    <RequireAuth>
+      <JoinLeaguePageContent />
+    </RequireAuth>
   );
 }

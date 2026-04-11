@@ -1,10 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { RequireAuth } from "@/components/require-auth";
 
 export default function AppAreaLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <RequireAuth>
-      <AppShell>{children}</AppShell>
-    </RequireAuth>
-  );
+  return <AppShell>{children}</AppShell>;
 }

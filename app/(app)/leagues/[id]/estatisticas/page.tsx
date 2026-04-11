@@ -6,7 +6,9 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LeagueStatsCharts } from "@/components/league-stats-charts";
 import { LeagueStatsTextBlocks } from "@/components/league-stats-text-blocks";
+import { useAuth } from "@/contexts/auth-context";
 import { leaguesApi } from "@/lib/api/leagues";
+import { leagueAccessErrorMessage } from "@/lib/league-access-error";
 import {
   aggregateWinnerStats,
   buildWinnerByRound,
@@ -17,6 +19,7 @@ import {
 export default function LeagueStatsPage() {
   const params = useParams();
   const id = params.id as string;
+  const { user } = useAuth();
 
   const { data: league, isLoading, error } = useQuery({
     queryKey: ["league", id],
@@ -62,11 +65,22 @@ export default function LeagueStatsPage() {
 
   if (error || !league) {
     return (
-      <p className="rounded-lg bg-red-50 px-4 py-3 text-red-800 dark:bg-red-950/40 dark:text-red-200">
-        Liga não encontrada ou sem permissão.
-      </p>
+      <div>
+        <Link
+          href={user ? "/" : "/login"}
+          className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+        >
+          {user ? "← Minhas ligas" : "← Entrar na conta"}
+        </Link>
+        <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-red-800 dark:bg-red-950/40 dark:text-red-200">
+          {error ? leagueAccessErrorMessage(error) : "Liga não encontrada."}
+        </p>
+      </div>
     );
   }
+
+  const isMember = !!(user && (league.members ?? []).some((m) => m.userId === user.id));
+  const isPublicLeague = league.isPublic ?? false;
 
   return (
     <div>
@@ -77,6 +91,22 @@ export default function LeagueStatsPage() {
         ← Voltar à liga
       </Link>
       <h1 className="mt-4 text-2xl font-semibold">Estatísticas — {league.name}</h1>
+
+      {isPublicLeague && !isMember && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+          {!user ? (
+            <p>
+              Vista pública destas estatísticas.{" "}
+              <Link href="/login" className="font-medium text-emerald-800 underline dark:text-emerald-300">
+                Entrar
+              </Link>{" "}
+              para gerenciar ou entrar na liga com convite.
+            </p>
+          ) : (
+            <p>Você não é membro: vê apenas o que a liga expõe publicamente.</p>
+          )}
+        </div>
+      )}
       <div className="mt-2 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
         <p>
           Valor da rodada: <strong>R$ {roundValue.toFixed(2)}</strong> · {members.length} participante

@@ -33,6 +33,7 @@ export type League = {
   adminId: string;
   roundValue: number;
   maxParticipants: number;
+  isPublic: boolean;
   inviteToken?: string;
   inviteTokenExpiresAt?: string;
   members: LeagueMember[];
