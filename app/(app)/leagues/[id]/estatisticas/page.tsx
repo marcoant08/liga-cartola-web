@@ -64,7 +64,11 @@ export default function LeagueStatsPage() {
   const roundValue = Number(league?.roundValue ?? 0);
   const leader = ranking[0];
   const totalRounds = rounds.length;
-  const worstDrought = winDroughtRows[0];
+  const worstDroughtTied = useMemo(() => {
+    if (winDroughtRows.length === 0) return [];
+    const max = winDroughtRows[0].roundsSinceLastWin;
+    return winDroughtRows.filter((r) => r.roundsSinceLastWin === max);
+  }, [winDroughtRows]);
 
   if (isLoading) {
     return <p className="text-zinc-500">Carregando estatísticas…</p>;
@@ -153,19 +157,20 @@ export default function LeagueStatsPage() {
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Ainda não há rodadas registradas.</p>
           ) : members.length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Sem participantes na liga.</p>
-          ) : worstDrought ? (
+          ) : worstDroughtTied.length > 0 ? (
             <>
               <p className="mt-1 text-2xl font-semibold text-amber-950 dark:text-amber-50">
-                {worstDrought.roundsSinceLastWin}{" "}
+                {worstDroughtTied[0].roundsSinceLastWin}{" "}
                 <span className="text-lg font-medium text-amber-900/90 dark:text-amber-100/90">
-                  rodada{worstDrought.roundsSinceLastWin === 1 ? "" : "s"}
+                  rodada{worstDroughtTied[0].roundsSinceLastWin === 1 ? "" : "s"}
                 </span>
               </p>
-              <p className="mt-1 truncate text-sm font-medium text-amber-950 dark:text-amber-100">
-                {worstDrought.displayName}
+              <p className="mt-1 text-sm font-medium leading-snug text-amber-950 dark:text-amber-100">
+                {worstDroughtTied.map((p) => p.displayName).join(" · ")}
               </p>
               <p className="mt-2 text-xs text-amber-900/75 dark:text-amber-200/80">
-                Rodadas já registradas, da mais recente até a última vitória deste jogador.
+                Rodadas já registradas, da mais recente até a última vitória{" "}
+                {worstDroughtTied.length > 1 ? "destes jogadores" : "deste jogador"}.
               </p>
             </>
           ) : (
