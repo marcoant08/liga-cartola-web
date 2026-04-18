@@ -107,7 +107,7 @@ export function LeagueStatsTextBlocks({
     [members, rounds],
   );
 
-  const podium = players.slice(0, 3);
+  const podium = players.filter((p) => p.wins > 0).slice(0, 3);
   const receitaPorVitória = receiptPerWin(memberCount, roundValue);
   const membersByTeam = [...members].sort((a, b) => {
     const ta = (a.teamName?.trim() || a.userName).toLowerCase();
