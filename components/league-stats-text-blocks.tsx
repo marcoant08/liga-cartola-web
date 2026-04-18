@@ -3,7 +3,13 @@
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import type { LeagueMember, Round } from "@/lib/types/api";
-import { computeRoundsSinceLastWin, formatBRL, receiptPerWin, type SeasonPlayerLine } from "@/lib/stats";
+import {
+  computeRoundsSinceLastWin,
+  formatBRL,
+  receiptPerWin,
+  topDroughtHistoryEvents,
+  type SeasonPlayerLine,
+} from "@/lib/stats";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -95,6 +101,11 @@ export function LeagueStatsTextBlocks({
   lastRound,
 }: Props) {
   const winDroughtRows = useMemo(() => computeRoundsSinceLastWin(members, rounds), [members, rounds]);
+
+  const topDroughtHistory = useMemo(
+    () => topDroughtHistoryEvents(members, rounds, 20),
+    [members, rounds],
+  );
 
   const podium = players.slice(0, 3);
   const receitaPorVitória = receiptPerWin(memberCount, roundValue);
@@ -248,6 +259,41 @@ export function LeagueStatsTextBlocks({
               value={formatWinDroughtValue(row, players, registeredRoundsCount)}
             />
           ))
+        )}
+      </StatSection>
+
+      <StatSection title="Histórico de maiores jejuns">
+        <StatIntro>
+          {registeredRoundsCount === 0 ? (
+            <>Sem rodadas cadastradas.</>
+          ) : (
+            <>
+              Períodos consecutivos sem vitória nas rodadas já registradas. Ao vencer, o período encerra e começa
+              nova contagem. Top 20 entre todos os jogadores e todos os períodos (o mesmo nome pode aparecer mais
+              de uma vez).
+            </>
+          )}
+        </StatIntro>
+        {members.length === 0 ? (
+          <p className="py-1.5 text-zinc-500">Nenhum membro na liga.</p>
+        ) : registeredRoundsCount === 0 ? (
+          <p className="py-1.5 text-zinc-500">—</p>
+        ) : topDroughtHistory.length === 0 ? (
+          <p className="py-1.5 text-zinc-500">Nenhum jejum registrado.</p>
+        ) : (
+          topDroughtHistory.map((e, i) => {
+            const roundsSpan =
+              e.fromRound === e.toRound
+                ? `rodada ${e.fromRound}`
+                : `rodadas ${e.fromRound}–${e.toRound}`;
+            return (
+              <LineRow
+                key={`${e.userId}-${e.fromRound}-${e.toRound}-${i}`}
+                label={`${pad2(i + 1)}. ${e.displayName}`}
+                value={`${e.length} rodada${e.length === 1 ? "" : "s"} (${roundsSpan})`}
+              />
+            );
+          })
         )}
       </StatSection>
 

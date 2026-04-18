@@ -52,6 +52,21 @@ export function roundsSorted(rounds: Round[]): Round[] {
   return [...rounds].sort((a, b) => a.roundNumber - b.roundNumber);
 }
 
+/** Uma entrada por `roundNumber`: em caso de re-registro, vale o `registeredAt` mais recente. */
+export function canonicalRoundsTimeline(rounds: Round[]): Round[] {
+  const byNum = new Map<number, Round>();
+  for (const r of rounds) {
+    const prev = byNum.get(r.roundNumber);
+    const t = new Date(r.registeredAt).getTime();
+    if (!prev || t >= new Date(prev.registeredAt).getTime()) {
+      byNum.set(r.roundNumber, r);
+    }
+  }
+  return [...byNum.keys()]
+    .sort((a, b) => a - b)
+    .map((n) => byNum.get(n)!);
+}
+
 /** Total de rodadas do campeonato (Brasileirão) para % e fluxo financeiro estimado. */
 export const SEASON_TOTAL_ROUNDS = 38;
 
@@ -142,7 +157,7 @@ export function computeSeasonPlayerLines(
 
 export function buildWinnerByRound(rounds: Round[]): Map<number, string> {
   const map = new Map<number, string>();
-  for (const r of roundsSorted(rounds)) {
+  for (const r of canonicalRoundsTimeline(rounds)) {
     map.set(r.roundNumber, r.winnerName);
   }
   return map;
@@ -171,7 +186,7 @@ export function computeRoundsSinceLastWin(
   rounds: Round[],
 ): WinDroughtRow[] {
   if (members.length === 0) return [];
-  const sorted = roundsSorted(rounds);
+  const sorted = canonicalRoundsTimeline(rounds);
 
   const rows: WinDroughtRow[] = members.map((m) => {
     const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
@@ -194,4 +209,76 @@ export function computeRoundsSinceLastWin(
   });
 
   return rows;
+}
+
+export type DroughtHistoryEntry = {
+  userId: string;
+  displayName: string;
+  length: number;
+  fromRound: number;
+  toRound: number;
+};
+
+/** Jejuns consecutivos sem vitória (rodadas da timeline canônica); encerra ao vencer ou ao fim dos dados. */
+export function computeDroughtHistoryEvents(
+  members: LeagueMember[],
+  rounds: Round[],
+): DroughtHistoryEntry[] {
+  const timeline = canonicalRoundsTimeline(rounds);
+  if (members.length === 0 || timeline.length === 0) return [];
+
+  const out: DroughtHistoryEntry[] = [];
+
+  for (const m of members) {
+    const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
+    let streak = 0;
+    let fromRound = 0;
+    let toRound = 0;
+
+    for (const r of timeline) {
+      if (r.winnerId === m.userId) {
+        if (streak > 0) {
+          out.push({
+            userId: m.userId,
+            displayName,
+            length: streak,
+            fromRound,
+            toRound,
+          });
+        }
+        streak = 0;
+      } else {
+        if (streak === 0) fromRound = r.roundNumber;
+        streak++;
+        toRound = r.roundNumber;
+      }
+    }
+
+    if (streak > 0) {
+      out.push({
+        userId: m.userId,
+        displayName,
+        length: streak,
+        fromRound,
+        toRound,
+      });
+    }
+  }
+
+  return out;
+}
+
+export function topDroughtHistoryEvents(
+  members: LeagueMember[],
+  rounds: Round[],
+  limit = 10,
+): DroughtHistoryEntry[] {
+  const events = computeDroughtHistoryEvents(members, rounds);
+  events.sort((a, b) => {
+    if (b.length !== a.length) return b.length - a.length;
+    if (b.toRound !== a.toRound) return b.toRound - a.toRound;
+    if (a.fromRound !== b.fromRound) return a.fromRound - b.fromRound;
+    return a.displayName.localeCompare(b.displayName, "pt-BR");
+  });
+  return events.slice(0, limit);
 }
