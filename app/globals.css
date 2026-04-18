@@ -3,6 +3,26 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --team-chart-1: #b91c1c;
+  --team-chart-2: #166534;
+  --team-chart-3: #a16207;
+  --team-chart-4: #1d4ed8;
+  --team-chart-5: #c2410c;
+  --team-chart-6: #7e22ce;
+  --team-chart-7: #0f766e;
+  --team-chart-8: #be185d;
+  --team-chart-9: #4d7c0f;
+  --team-chart-10: #9d174d;
+  --team-chart-11: #155e75;
+  --team-chart-12: #6d28d9;
+  --team-chart-13: #92400e;
+  --team-chart-14: #9f1239;
+  --team-chart-15: #7f1d1d;
+  --team-chart-16: #0f766e;
+  --team-chart-17: #3f6212;
+  --team-chart-18: #9a3412;
+  --team-chart-19: #312e81;
+  --team-chart-20: #374151;
 }
 
 @theme inline {
@@ -16,6 +36,26 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --team-chart-1: #fca5a5;
+    --team-chart-2: #86efac;
+    --team-chart-3: #fde047;
+    --team-chart-4: #93c5fd;
+    --team-chart-5: #fdba74;
+    --team-chart-6: #d8b4fe;
+    --team-chart-7: #5eead4;
+    --team-chart-8: #f9a8d4;
+    --team-chart-9: #bef264;
+    --team-chart-10: #fda4af;
+    --team-chart-11: #67e8f9;
+    --team-chart-12: #c4b5fd;
+    --team-chart-13: #fcd34d;
+    --team-chart-14: #fda4af;
+    --team-chart-15: #fca5a5;
+    --team-chart-16: #99f6e4;
+    --team-chart-17: #d9f99d;
+    --team-chart-18: #fdba74;
+    --team-chart-19: #a5b4fc;
+    --team-chart-20: #d1d5db;
   }
 }
 

@@ -271,7 +271,7 @@ export function LeagueStatsTextBlocks({
             <StatIntro>
               <>
                 Períodos consecutivos sem vitória nas rodadas já registradas. Ao vencer, o período encerra e começa
-                nova contagem. Top 20 entre todos os jogadores e todos os períodos (o mesmo nome pode aparecer mais
+                nova contagem. Top até 20 entre todos os jogadores e todos os períodos (o mesmo nome pode aparecer mais
                 de uma vez). (Mostra apenas jejuns de 2+ rodadas.)
               </>
             </StatIntro>

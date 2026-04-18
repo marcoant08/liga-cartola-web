@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -19,18 +19,12 @@ import {
   type BarShapeProps,
 } from "recharts";
 import type { LeagueMember, Round } from "@/lib/types/api";
-import { aggregateWinnerStats, computeRoundsSinceLastWin, type SeasonPlayerLine } from "@/lib/stats";
-
-const COLORS = [
-  "#059669",
-  "#0d9488",
-  "#0891b2",
-  "#2563eb",
-  "#7c3aed",
-  "#c026d3",
-  "#db2777",
-  "#ea580c",
-];
+import {
+  aggregateWinnerStats,
+  computeRoundsSinceLastWin,
+  topDroughtHistoryEvents,
+  type SeasonPlayerLine,
+} from "@/lib/stats";
 
 function shortLabel(name: string, max = 14): string {
   const t = name.trim();
@@ -88,6 +82,39 @@ const shapePerdas = makeVerticalBarShape("#dc2626");
 const shapeLucro = makeVerticalBarShape("#059669");
 const shapeJejum = makeVerticalBarShape("#d97706");
 
+const tooltipContentStyle = {
+  borderRadius: 8,
+  border: "1px solid var(--color-zinc-200, #e4e4e7)",
+  backgroundColor: "var(--background)",
+  color: "var(--foreground)",
+} as const;
+
+// Paletas distintas por tema: escura no light, clara no dark.
+const TEAM_BAR_COLORS_LIGHT = [
+  "#b91c1c", "#166534", "#a16207", "#1d4ed8", "#c2410c",
+  "#7e22ce", "#0f766e", "#be185d", "#4d7c0f", "#9d174d",
+  "#155e75", "#6d28d9", "#92400e", "#9f1239", "#7f1d1d",
+  "#0f766e", "#3f6212", "#9a3412", "#312e81", "#374151",
+] as const;
+const TEAM_BAR_COLORS_DARK = [
+  "#fca5a5", "#86efac", "#fde047", "#93c5fd", "#fdba74",
+  "#d8b4fe", "#5eead4", "#f9a8d4", "#bef264", "#fda4af",
+  "#67e8f9", "#c4b5fd", "#fcd34d", "#fda4af", "#fca5a5",
+  "#99f6e4", "#d9f99d", "#fdba74", "#a5b4fc", "#d1d5db",
+] as const;
+
+function hashStringToInt(value: string): number {
+  // hash simples e estável (djb2)
+  let h = 5381;
+  for (let i = 0; i < value.length; i++) h = (h * 33) ^ value.charCodeAt(i);
+  return h >>> 0;
+}
+
+function barColorForUserId(userId: string, darkMode: boolean): string {
+  const palette = darkMode ? TEAM_BAR_COLORS_DARK : TEAM_BAR_COLORS_LIGHT;
+  return palette[hashStringToInt(userId) % palette.length];
+}
+
 type Props = {
   rounds: Round[];
   roundValue: number;
@@ -96,6 +123,16 @@ type Props = {
 };
 
 export function LeagueStatsCharts({ rounds, roundValue, members, players }: Props) {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setIsDarkMode(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
+
   const ranking = useMemo(
     () => aggregateWinnerStats(rounds, roundValue, members),
     [rounds, roundValue, members],
@@ -104,6 +141,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
   const barData = useMemo(
     () =>
       ranking.map((r) => ({
+        userId: r.winnerId,
         nome: shortLabel(r.displayName),
         vitórias: r.wins,
       })),
@@ -114,6 +152,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
     const totalWins = rounds.length;
     if (totalWins === 0) return [];
     return ranking.map((r) => ({
+      userId: r.winnerId,
       name: r.displayName.length > 18 ? `${r.displayName.slice(0, 16)}…` : r.displayName,
       value: r.wins,
     }));
@@ -122,9 +161,24 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
   const droughtBarData = useMemo(
     () =>
       computeRoundsSinceLastWin(members, rounds).map((r) => ({
+        userId: r.userId,
         nome: shortLabel(r.displayName),
         jejum: r.roundsSinceLastWin,
       })),
+    [members, rounds],
+  );
+
+  const top10DroughtHistoryData = useMemo(
+    () =>
+      topDroughtHistoryEvents(members, rounds, 10)
+        .filter((e) => e.length > 1)
+        .map((e, idx) => ({
+          userId: e.userId,
+          nome: shortLabel(e.displayName),
+          jejum: e.length,
+          periodo: e.fromRound === e.toRound ? `rodada ${e.fromRound}` : `rodadas ${e.fromRound}-${e.toRound}`,
+          rank: idx + 1,
+        })),
     [members, rounds],
   );
 
@@ -184,6 +238,14 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
   const moneyFmt = (v: unknown) =>
     `R$ ${typeof v === "number" ? v.toFixed(2) : String(v ?? "—")}`;
 
+  const membersSortedByTeam = useMemo(() => {
+    return [...members].sort((a, b) => {
+      const ta = (a.teamName?.trim() || a.userName || a.userId).toLowerCase();
+      const tb = (b.teamName?.trim() || b.userName || b.userId).toLowerCase();
+      return ta.localeCompare(tb, "pt-BR");
+    });
+  }, [members]);
+
   return (
     <div className="grid gap-8">
       {rounds.length === 0 ? (
@@ -192,6 +254,32 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
           financeiros usam só as rodadas já cadastradas (neste momento, zeros).
         </p>
       ) : null}
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Times e cores</h2>
+        <p className="mb-3 text-xs text-zinc-500">
+          As cores abaixo são as mesmas usadas nos gráficos (cada time mantém sempre a sua cor).
+        </p>
+        <div className="space-y-2">
+          {membersSortedByTeam.map((m) => {
+            const label = (m.teamName?.trim() || m.userName || m.userId).trim();
+            const color = barColorForUserId(m.userId, isDarkMode);
+            return (
+              <div
+                key={m.userId}
+                className="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-100"
+              >
+                <span
+                  className="h-3.5 w-3.5 rounded-full ring-1 ring-zinc-900/10 dark:ring-white/10"
+                  style={{ backgroundColor: color }}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <section>
         <h2 className="mb-2 text-lg font-semibold">Rodadas sem vencer (desde a última vitória)</h2>
@@ -211,10 +299,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip
-                  contentStyle={{
-                    borderRadius: 8,
-                    border: "1px solid var(--color-zinc-200, #e4e4e7)",
-                  }}
+                  contentStyle={tooltipContentStyle}
                   formatter={(v) => [`${v} rodada(s)`, "Sem vencer"]}
                 />
                 <Bar
@@ -223,12 +308,52 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                   radius={[4, 4, 0, 0]}
                   name="Rodadas sem vitória"
                   shape={shapeJejum}
-                />
+                >
+                  {droughtBarData.map((e, i) => (
+                    <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         )}
       </section>
+
+      {top10DroughtHistoryData.length > 0 ? (
+        <section>
+          <h2 className="mb-2 text-lg font-semibold">Top 10 - histórico de maiores jejuns</h2>
+          <p className="mb-2 text-xs text-zinc-500">
+            Considera períodos consecutivos sem vitória; ao vencer, um novo jejum começa. Mostra apenas jejuns de 2+
+            rodadas.
+          </p>
+          <div className="h-80 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={top10DroughtHistoryData} margin={{ top: 8, right: 8, left: 0, bottom: 64 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
+                <XAxis dataKey="nome" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={tooltipContentStyle}
+                  formatter={(v, _n, item) => {
+                    const p = (item?.payload as { periodo?: string } | undefined)?.periodo ?? "—";
+                    return [`${v} rodada(s)`, `Jejum (${p})`];
+                  }}
+                />
+                <Bar
+                  dataKey="jejum"
+                  radius={[4, 4, 0, 0]}
+                  name="Maior jejum"
+                  shape={shapeJejum}
+                >
+                  {top10DroughtHistoryData.map((e, i) => (
+                    <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      ) : null}
 
       <section>
         <h2 className="mb-2 text-lg font-semibold">Vitórias por participante</h2>
@@ -239,10 +364,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
               <XAxis dataKey="nome" angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
               <Tooltip
-                contentStyle={{
-                  borderRadius: 8,
-                  border: "1px solid var(--color-zinc-200, #e4e4e7)",
-                }}
+                contentStyle={tooltipContentStyle}
               />
               <Bar
                 dataKey="vitórias"
@@ -250,7 +372,11 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 radius={[4, 4, 0, 0]}
                 name="Vitórias"
                 shape={shapeVitórias}
-              />
+              >
+                {barData.map((e, i) => (
+                  <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -344,8 +470,8 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                   `${String(name)}: ${((percent ?? 0) * 100).toFixed(1)}%`
                 }
               >
-                {pieData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                {pieData.map((e, i) => (
+                  <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
                 ))}
               </Pie>
               <Tooltip />
