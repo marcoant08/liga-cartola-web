@@ -11,12 +11,16 @@ const memberNav = [
   { href: "/profile", label: "Perfil" },
 ];
 
+const STATS_PAGE_PATH = /^\/leagues\/[^/]+\/estatisticas$/;
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout, ready } = useAuth();
+  const hideHeader = STATS_PAGE_PATH.test(pathname);
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
+      {!hideHeader && (
       <header className="border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-3">
           <Link href={user ? "/" : "/login"} className="text-lg font-semibold text-emerald-700 dark:text-emerald-400">
@@ -90,6 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
+      )}
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
     </div>
   );

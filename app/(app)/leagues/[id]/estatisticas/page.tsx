@@ -101,13 +101,7 @@ export default function LeagueStatsPage() {
 
   return (
     <div>
-      <Link
-        href={`/leagues/${id}`}
-        className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
-      >
-        ← Voltar à liga
-      </Link>
-      <h1 className="mt-4 text-2xl font-semibold">Estatísticas — {league.name}</h1>
+      <h1 className="text-2xl font-semibold">Estatísticas — {league.name}</h1>
 
       {isPublicLeague && !isMember && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
