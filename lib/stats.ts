@@ -70,6 +70,19 @@ export function canonicalRoundsTimeline(rounds: Round[]): Round[] {
 /** Total de rodadas do campeonato (Brasileirão) para % e fluxo financeiro estimado. */
 export const SEASON_TOTAL_ROUNDS = 38;
 
+/**
+ * Próxima rodada sugerida para registro: maior `roundNumber` já presente + 1, limitado a `totalRounds`.
+ * Sem rodadas, retorna 1.
+ */
+export function nextRoundToRegister(
+  rounds: Round[],
+  totalRounds: number = SEASON_TOTAL_ROUNDS,
+): number {
+  if (rounds.length === 0) return 1;
+  const maxRound = Math.max(...rounds.map((r) => r.roundNumber));
+  return Math.min(totalRounds, Math.max(1, maxRound + 1));
+}
+
 export type SeasonPlayerLine = {
   userId: string;
   displayName: string;

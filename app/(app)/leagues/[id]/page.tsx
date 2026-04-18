@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import { leaguesApi } from "@/lib/api/leagues";
 import { roundsApi } from "@/lib/api/rounds";
 import { ApiError } from "@/lib/api/error";
+import { ArrowIcon } from "@/components/icons";
 import { leagueAccessErrorMessage } from "@/lib/league-access-error";
-import { roundsSorted } from "@/lib/stats";
+import { nextRoundToRegister, roundsSorted, SEASON_TOTAL_ROUNDS } from "@/lib/stats";
 
 export default function LeagueDetailPage() {
   const params = useParams();
@@ -46,6 +47,16 @@ export default function LeagueDetailPage() {
     null,
   );
   const [copyPublicHint, setCopyPublicHint] = useState<string | null>(null);
+
+  const suggestedRoundNumber = useMemo(
+    () => nextRoundToRegister(league?.rounds ?? []),
+    [league?.rounds],
+  );
+  const roundSelectMax = suggestedRoundNumber;
+
+  useEffect(() => {
+    setRoundNumber(String(suggestedRoundNumber));
+  }, [suggestedRoundNumber]);
 
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -429,32 +440,64 @@ export default function LeagueDetailPage() {
           <div className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-700">
             <h3 className="font-medium">Registrar campeão da rodada</h3>
             <form
-              className="mt-3 flex flex-wrap items-end gap-3"
+              className="mt-3 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-center"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!winnerId) return;
                 registerRoundMutation.mutate();
               }}
             >
-              <label className="text-sm font-medium">
-                Rodada (1–38)
-                <input
-                  type="number"
-                  min={1}
-                  max={38}
-                  required
-                  value={roundNumber}
-                  onChange={(e) => setRoundNumber(e.target.value)}
-                  className="mt-1 block w-24 rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
-                />
+              <label className="w-full text-sm font-medium md:w-auto">
+                Rodada (1–{roundSelectMax})
+                <div className="mt-1 flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Rodada anterior"
+                    disabled={Number(roundNumber) <= 1}
+                    onClick={() => {
+                      const n = Number(roundNumber);
+                      setRoundNumber(String(Math.max(1, n - 1)));
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-300 bg-white text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                  >
+                    <ArrowIcon direction="left" width={22} height={22} />
+                  </button>
+                  <select
+                    required
+                    value={roundNumber}
+                    onChange={(e) => setRoundNumber(e.target.value)}
+                    className="block min-w-34 grow rounded-lg border border-zinc-300 px-3 py-2 text-center text-base dark:border-zinc-600 dark:bg-zinc-950"
+                  >
+                    {Array.from({ length: roundSelectMax }, (_, i) => {
+                      const n = i + 1;
+                      return (
+                        <option key={n} value={String(n)}>
+                          Rodada {n}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    type="button"
+                    aria-label="Próxima rodada"
+                    disabled={Number(roundNumber) >= roundSelectMax}
+                    onClick={() => {
+                      const n = Number(roundNumber);
+                      setRoundNumber(String(Math.min(roundSelectMax, n + 1)));
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-300 bg-white text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                  >
+                    <ArrowIcon direction="right" width={22} height={22} />
+                  </button>
+                </div>
               </label>
-              <label className="text-sm font-medium">
+              <label className="w-full text-sm font-medium md:w-auto">
                 Campeão
                 <select
                   required
                   value={winnerId}
                   onChange={(e) => setWinnerId(e.target.value)}
-                  className="mt-1 block min-w-[200px] rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+                  className="mt-1 block w-full min-w-[200px] rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-950 md:w-auto"
                 >
                   <option value="">Selecione…</option>
                   {members.map((m) => (
@@ -468,7 +511,7 @@ export default function LeagueDetailPage() {
               <button
                 type="submit"
                 disabled={registerRoundMutation.isPending}
-                className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 md:w-auto"
               >
                 {registerRoundMutation.isPending ? "Salvando…" : "Registrar"}
               </button>

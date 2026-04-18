@@ -66,7 +66,7 @@ function moneyValueNode(value: number): ReactNode {
   return text;
 }
 
-/** Texto do card «Mais rodadas sem vencer»: jejum numérico, «Último vencedor» ou «Ainda não venceu». */
+/** Texto do card «Sequência atual de rodadas sem vencer»: jejum numérico, «Último vencedor» ou «Ainda não venceu». */
 function formatWinDroughtValue(
   row: { userId: string; roundsSinceLastWin: number },
   players: SeasonPlayerLine[],
@@ -239,7 +239,7 @@ export function LeagueStatsTextBlocks({
         )}
       </StatSection>
 
-      <StatSection title="Mais rodadas sem vencer">
+      <StatSection title="Sequência atual de rodadas sem vencer">
         <StatIntro>
           {registeredRoundsCount === 0 ? (
             <>Sem rodadas cadastradas — todos com 0.</>
@@ -262,40 +262,35 @@ export function LeagueStatsTextBlocks({
         )}
       </StatSection>
 
-      <StatSection title="Histórico de maiores jejuns">
-        <StatIntro>
-          {registeredRoundsCount === 0 ? (
-            <>Sem rodadas cadastradas.</>
-          ) : (
-            <>
-              Períodos consecutivos sem vitória nas rodadas já registradas. Ao vencer, o período encerra e começa
-              nova contagem. Top 20 entre todos os jogadores e todos os períodos (o mesmo nome pode aparecer mais
-              de uma vez).
-            </>
-          )}
-        </StatIntro>
-        {members.length === 0 ? (
-          <p className="py-1.5 text-zinc-500">Nenhum membro na liga.</p>
-        ) : registeredRoundsCount === 0 ? (
-          <p className="py-1.5 text-zinc-500">—</p>
-        ) : topDroughtHistory.length === 0 ? (
-          <p className="py-1.5 text-zinc-500">Nenhum jejum registrado.</p>
-        ) : (
-          topDroughtHistory.map((e, i) => {
-            const roundsSpan =
-              e.fromRound === e.toRound
-                ? `rodada ${e.fromRound}`
-                : `rodadas ${e.fromRound}–${e.toRound}`;
-            return (
-              <LineRow
-                key={`${e.userId}-${e.fromRound}-${e.toRound}-${i}`}
-                label={`${pad2(i + 1)}. ${e.displayName}`}
-                value={`${e.length} rodada${e.length === 1 ? "" : "s"} (${roundsSpan})`}
-              />
-            );
-          })
-        )}
-      </StatSection>
+      {(() => {
+        const rows = topDroughtHistory.filter((e) => e.length > 1);
+        if (registeredRoundsCount === 0 || members.length === 0 || rows.length === 0) return null;
+
+        return (
+          <StatSection title="Histórico de maiores jejuns">
+            <StatIntro>
+              <>
+                Períodos consecutivos sem vitória nas rodadas já registradas. Ao vencer, o período encerra e começa
+                nova contagem. Top 20 entre todos os jogadores e todos os períodos (o mesmo nome pode aparecer mais
+                de uma vez). (Mostra apenas jejuns de 2+ rodadas.)
+              </>
+            </StatIntro>
+            {rows.map((e, i) => {
+              const roundsSpan =
+                e.fromRound === e.toRound
+                  ? `rodada ${e.fromRound}`
+                  : `rodadas ${e.fromRound}–${e.toRound}`;
+              return (
+                <LineRow
+                  key={`${e.userId}-${e.fromRound}-${e.toRound}-${i}`}
+                  label={`${pad2(i + 1)}. ${e.displayName}`}
+                  value={`${e.length} rodadas (${roundsSpan})`}
+                />
+              );
+            })}
+          </StatSection>
+        );
+      })()}
 
       <StatSection title="✅ Número de vitórias no campeonato">
         {players.map((p) => (
