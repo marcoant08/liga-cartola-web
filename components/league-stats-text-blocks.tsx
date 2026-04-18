@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import type { LeagueMember, Round } from "@/lib/types/api";
 import {
+  computeConsecutiveWinsAtEnd,
   computeRoundsSinceLastWin,
   formatBRL,
   receiptPerWin,
   topDroughtHistoryEvents,
+  topWinStreakHistoryEvents,
   type SeasonPlayerLine,
 } from "@/lib/stats";
 
@@ -104,6 +106,16 @@ export function LeagueStatsTextBlocks({
 
   const topDroughtHistory = useMemo(
     () => topDroughtHistoryEvents(members, rounds, 20),
+    [members, rounds],
+  );
+
+  const consecutiveWinsAtEndRows = useMemo(
+    () => computeConsecutiveWinsAtEnd(members, rounds),
+    [members, rounds],
+  );
+
+  const topWinStreakHistory = useMemo(
+    () => topWinStreakHistoryEvents(members, rounds, 10),
     [members, rounds],
   );
 
@@ -267,12 +279,42 @@ export function LeagueStatsTextBlocks({
         if (registeredRoundsCount === 0 || members.length === 0 || rows.length === 0) return null;
 
         return (
-          <StatSection title="Histórico de maiores jejuns">
+          <StatSection title="Histórico de maiores sequências de derrota">
             <StatIntro>
               <>
                 Períodos consecutivos sem vitória nas rodadas já registradas. Ao vencer, o período encerra e começa
-                nova contagem. Top até 20 entre todos os jogadores e todos os períodos (o mesmo nome pode aparecer mais
-                de uma vez). (Mostra apenas jejuns de 2+ rodadas.)
+                nova contagem. Top 20 entre todos os jogadores e todos os períodos (o mesmo nome pode aparecer mais
+                de uma vez). (Mostra apenas sequências de derrota de 2+ rodadas.)
+              </>
+            </StatIntro>
+            {rows.map((e, i) => {
+              const roundsSpan =
+                e.fromRound === e.toRound
+                  ? `rodada ${e.fromRound}`
+                  : `rodadas ${e.fromRound}–${e.toRound}`;
+              return (
+                <LineRow
+                  key={`${e.userId}-${e.fromRound}-${e.toRound}-${i}`}
+                  label={`${pad2(i + 1)}. ${e.displayName}`}
+                  value={`${e.length} rodadas (${roundsSpan})`}
+                />
+              );
+            })}
+          </StatSection>
+        );
+      })()}
+
+      {(() => {
+        const rows = topWinStreakHistory.filter((e) => e.length > 1);
+        if (registeredRoundsCount === 0 || members.length === 0 || rows.length === 0) return null;
+
+        return (
+          <StatSection title="Histórico de maiores sequências de vitória">
+            <StatIntro>
+              <>
+                Períodos consecutivos em que o jogador foi campeão nas rodadas já registradas. Ao não vencer, o
+                período encerra e começa nova contagem. Top 10 entre todos os jogadores e todos os períodos (o mesmo
+                nome pode aparecer mais de uma vez). (Mostra apenas sequências de 2+ rodadas.)
               </>
             </StatIntro>
             {rows.map((e, i) => {

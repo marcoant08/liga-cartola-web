@@ -295,3 +295,106 @@ export function topDroughtHistoryEvents(
   });
   return events.slice(0, limit);
 }
+
+export type WinStreakHistoryEntry = DroughtHistoryEntry;
+
+/** Vitórias consecutivas nas rodadas da timeline; encerra quando o jogador não é campeão. */
+export function computeWinStreakHistoryEvents(
+  members: LeagueMember[],
+  rounds: Round[],
+): WinStreakHistoryEntry[] {
+  const timeline = canonicalRoundsTimeline(rounds);
+  if (members.length === 0 || timeline.length === 0) return [];
+
+  const out: WinStreakHistoryEntry[] = [];
+
+  for (const m of members) {
+    const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
+    let streak = 0;
+    let fromRound = 0;
+    let toRound = 0;
+
+    for (const r of timeline) {
+      if (r.winnerId === m.userId) {
+        if (streak === 0) fromRound = r.roundNumber;
+        streak++;
+        toRound = r.roundNumber;
+      } else {
+        if (streak > 0) {
+          out.push({
+            userId: m.userId,
+            displayName,
+            length: streak,
+            fromRound,
+            toRound,
+          });
+        }
+        streak = 0;
+      }
+    }
+
+    if (streak > 0) {
+      out.push({
+        userId: m.userId,
+        displayName,
+        length: streak,
+        fromRound,
+        toRound,
+      });
+    }
+  }
+
+  return out;
+}
+
+export function topWinStreakHistoryEvents(
+  members: LeagueMember[],
+  rounds: Round[],
+  limit = 10,
+): WinStreakHistoryEntry[] {
+  const events = computeWinStreakHistoryEvents(members, rounds);
+  events.sort((a, b) => {
+    if (b.length !== a.length) return b.length - a.length;
+    if (b.toRound !== a.toRound) return b.toRound - a.toRound;
+    if (a.fromRound !== b.fromRound) return a.fromRound - b.fromRound;
+    return a.displayName.localeCompare(b.displayName, "pt-BR");
+  });
+  return events.slice(0, limit);
+}
+
+/** Quantas rodadas consecutivas (a partir da mais recente na timeline) o jogador foi campeão. */
+export type ConsecutiveWinsAtEndRow = {
+  userId: string;
+  displayName: string;
+  consecutiveWinsAtEnd: number;
+};
+
+export function computeConsecutiveWinsAtEnd(
+  members: LeagueMember[],
+  rounds: Round[],
+): ConsecutiveWinsAtEndRow[] {
+  if (members.length === 0) return [];
+  const timeline = canonicalRoundsTimeline(rounds);
+
+  const rows: ConsecutiveWinsAtEndRow[] = members.map((m) => {
+    const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
+    if (timeline.length === 0) {
+      return { userId: m.userId, displayName, consecutiveWinsAtEnd: 0 };
+    }
+    let count = 0;
+    for (let i = timeline.length - 1; i >= 0; i--) {
+      if (timeline[i].winnerId !== m.userId) break;
+      count++;
+    }
+    return { userId: m.userId, displayName, consecutiveWinsAtEnd: count };
+  });
+
+  rows.sort((a, b) => {
+    if (b.consecutiveWinsAtEnd !== a.consecutiveWinsAtEnd) {
+      return b.consecutiveWinsAtEnd - a.consecutiveWinsAtEnd;
+    }
+    return a.displayName.localeCompare(b.displayName, "pt-BR");
+  });
+
+  return rows;
+}

@@ -21,8 +21,10 @@ import {
 import type { LeagueMember, Round } from "@/lib/types/api";
 import {
   aggregateWinnerStats,
+  computeConsecutiveWinsAtEnd,
   computeRoundsSinceLastWin,
   topDroughtHistoryEvents,
+  topWinStreakHistoryEvents,
   type SeasonPlayerLine,
 } from "@/lib/stats";
 
@@ -81,6 +83,7 @@ const shapeGanhos = makeVerticalBarShape("#059669");
 const shapePerdas = makeVerticalBarShape("#dc2626");
 const shapeLucro = makeVerticalBarShape("#059669");
 const shapeJejum = makeVerticalBarShape("#d97706");
+const shapeSequenciaVitórias = makeVerticalBarShape("#059669");
 
 const tooltipContentStyle = {
   borderRadius: 8,
@@ -176,6 +179,30 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
           userId: e.userId,
           nome: shortLabel(e.displayName),
           jejum: e.length,
+          periodo: e.fromRound === e.toRound ? `rodada ${e.fromRound}` : `rodadas ${e.fromRound}-${e.toRound}`,
+          rank: idx + 1,
+        })),
+    [members, rounds],
+  );
+
+  const winStreakBarData = useMemo(
+    () =>
+      computeConsecutiveWinsAtEnd(members, rounds).map((r) => ({
+        userId: r.userId,
+        nome: shortLabel(r.displayName),
+        sequencia: r.consecutiveWinsAtEnd,
+      })),
+    [members, rounds],
+  );
+
+  const top10WinStreakHistoryData = useMemo(
+    () =>
+      topWinStreakHistoryEvents(members, rounds, 10)
+        .filter((e) => e.length > 1)
+        .map((e, idx) => ({
+          userId: e.userId,
+          nome: shortLabel(e.displayName),
+          sequencia: e.length,
           periodo: e.fromRound === e.toRound ? `rodada ${e.fromRound}` : `rodadas ${e.fromRound}-${e.toRound}`,
           rank: idx + 1,
         })),
@@ -321,7 +348,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
 
       {top10DroughtHistoryData.length > 0 ? (
         <section>
-          <h2 className="mb-2 text-lg font-semibold">Top 10 - histórico de maiores jejuns</h2>
+          <h2 className="mb-2 text-lg font-semibold">Top 10 - histórico de maiores sequências de derrota</h2>
           <p className="mb-2 text-xs text-zinc-500">
             Considera períodos consecutivos sem vitória; ao vencer, um novo jejum começa. Mostra apenas jejuns de 2+
             rodadas.
@@ -346,6 +373,43 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                   shape={shapeJejum}
                 >
                   {top10DroughtHistoryData.map((e, i) => (
+                    <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      ) : null}
+
+      {top10WinStreakHistoryData.length > 0 ? (
+        <section>
+          <h2 className="mb-2 text-lg font-semibold">Top 10 - histórico de maiores sequências de vitória</h2>
+          <p className="mb-2 text-xs text-zinc-500">
+            Considera períodos consecutivos como campeão; ao não vencer, o período encerra e começa nova contagem.
+            Mostra apenas sequências de 2+ rodadas.
+          </p>
+          <div className="h-80 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={top10WinStreakHistoryData} margin={{ top: 8, right: 8, left: 0, bottom: 64 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
+                <XAxis dataKey="nome" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={tooltipContentStyle}
+                  formatter={(v, _n, item) => {
+                    const p = (item?.payload as { periodo?: string } | undefined)?.periodo ?? "—";
+                    return [`${v} rodada(s)`, `Vitórias (${p})`];
+                  }}
+                />
+                <Bar
+                  dataKey="sequencia"
+                  fill="#059669"
+                  radius={[4, 4, 0, 0]}
+                  name="Sequência de vitórias"
+                  shape={shapeSequenciaVitórias}
+                >
+                  {top10WinStreakHistoryData.map((e, i) => (
                     <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
                   ))}
                 </Bar>
