@@ -21,7 +21,6 @@ import {
 import type { LeagueMember, Round } from "@/lib/types/api";
 import {
   aggregateWinnerStats,
-  computeConsecutiveWinsAtEnd,
   computeRoundsSinceLastWin,
   topDroughtHistoryEvents,
   topWinStreakHistoryEvents,
@@ -110,23 +109,31 @@ const tooltipWrapperStyle = {
   outline: "none",
 } as const;
 
-const tooltipCursorFill = { fill: "rgba(0, 0, 0, 0.06)" };
+function chartColumnCursor(dark: boolean) {
+  return dark
+    ? { fill: "rgba(63, 63, 70, 0.42)" }
+    : { fill: "rgba(244, 244, 245, 0.92)" };
+}
 
-type DroughtHistoryChartRow = {
+function activeBarFill(dark: boolean) {
+  return dark ? "rgba(255, 255, 255, 0.16)" : "rgba(0, 0, 0, 0.1)";
+}
+
+/** Linha do Top 10 (jejum / vitórias): eixo X único por evento para o Recharts não misturar tooltips quando o time se repete. */
+type SequenceHistoryChartRow = {
   userId: string;
-  nome: string;
+  categoria: string;
   nomeTime: string;
-  jejum: number;
+  rodadas: number;
   periodo: string;
-  rank: number;
 };
 
-function DroughtHistoryTooltipContent({
+function SequenceHistoryTooltip({
   active,
   payload,
 }: {
   active?: boolean;
-  payload?: ReadonlyArray<{ payload?: DroughtHistoryChartRow }>;
+  payload?: ReadonlyArray<{ payload?: SequenceHistoryChartRow }>;
 }) {
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload;
@@ -135,9 +142,44 @@ function DroughtHistoryTooltipContent({
     <div className="rounded-lg px-3 py-2 text-sm" style={tooltipContentStyle}>
       <p style={tooltipLabelStyle}>{row.nomeTime}</p>
       <p style={tooltipItemStyle}>
-        {row.jejum} rodada{row.jejum === 1 ? "" : "s"}
+        {row.rodadas} rodada{row.rodadas === 1 ? "" : "s"}
       </p>
       <p style={{ ...tooltipItemStyle, fontSize: 12, opacity: 0.75, marginTop: 4 }}>{row.periodo}</p>
+    </div>
+  );
+}
+
+function formatMoneyTooltip(v: number): string {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+}
+
+type MoneyTooltipKind = "ganho" | "perda" | "lucro";
+
+function MoneySeriesTooltip({
+  kind,
+  active,
+  payload,
+}: {
+  kind: MoneyTooltipKind;
+  active?: boolean;
+  payload?: ReadonlyArray<{ payload?: { nome: string; valor: number } }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+  const { valor } = row;
+  const titulo = kind === "ganho" ? "Recebimentos" : kind === "perda" ? "Perdas" : "Lucro";
+  const tituloCor =
+    kind === "ganho" ? "#059669" : kind === "perda" ? "#dc2626" : "#71717a";
+  const valorCor =
+    kind === "ganho" ? "#059669" : kind === "perda" ? "#dc2626" : valor >= 0 ? "#059669" : "#dc2626";
+  return (
+    <div className="rounded-lg px-3 py-2 text-sm" style={tooltipContentStyle}>
+      <p style={{ ...tooltipLabelStyle, color: tituloCor }}>{titulo}</p>
+      <p style={{ ...tooltipItemStyle, marginTop: 4 }}>{row.nome}</p>
+      <p style={{ ...tooltipItemStyle, color: valorCor, fontWeight: 600, marginTop: 6 }}>
+        {formatMoneyTooltip(valor)}
+      </p>
     </div>
   );
 }
@@ -227,22 +269,14 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
         .filter((e) => e.length > 1)
         .map((e, idx) => ({
           userId: e.userId,
-          nome: shortLabel(e.displayName),
+          categoria: `${idx + 1}. ${shortLabel(e.displayName)}`,
           nomeTime: e.displayName.trim(),
-          jejum: e.length,
-          periodo: e.fromRound === e.toRound ? `rodada ${e.fromRound}` : `rodadas ${e.fromRound}-${e.toRound}`,
-          rank: idx + 1,
+          rodadas: e.length,
+          periodo:
+            e.fromRound === e.toRound
+              ? `Rodada ${e.fromRound}`
+              : `Rodadas ${e.fromRound}–${e.toRound}`,
         })),
-    [members, rounds],
-  );
-
-  const winStreakBarData = useMemo(
-    () =>
-      computeConsecutiveWinsAtEnd(members, rounds).map((r) => ({
-        userId: r.userId,
-        nome: shortLabel(r.displayName),
-        sequencia: r.consecutiveWinsAtEnd,
-      })),
     [members, rounds],
   );
 
@@ -252,10 +286,13 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
         .filter((e) => e.length > 1)
         .map((e, idx) => ({
           userId: e.userId,
-          nome: shortLabel(e.displayName),
-          sequencia: e.length,
-          periodo: e.fromRound === e.toRound ? `rodada ${e.fromRound}` : `rodadas ${e.fromRound}-${e.toRound}`,
-          rank: idx + 1,
+          categoria: `${idx + 1}. ${shortLabel(e.displayName)}`,
+          nomeTime: e.displayName.trim(),
+          rodadas: e.length,
+          periodo:
+            e.fromRound === e.toRound
+              ? `Rodada ${e.fromRound}`
+              : `Rodadas ${e.fromRound}–${e.toRound}`,
         })),
     [members, rounds],
   );
@@ -305,17 +342,6 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
     [players],
   );
 
-  if (members.length === 0) {
-    return (
-      <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
-        Nenhum participante na liga.
-      </p>
-    );
-  }
-
-  const moneyFmt = (v: unknown) =>
-    `R$ ${typeof v === "number" ? v.toFixed(2) : String(v ?? "—")}`;
-
   const membersSortedByTeam = useMemo(() => {
     return [...members].sort((a, b) => {
       const ta = (a.teamName?.trim() || a.userName || a.userId).toLowerCase();
@@ -323,6 +349,14 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
       return ta.localeCompare(tb, "pt-BR");
     });
   }, [members]);
+
+  if (members.length === 0) {
+    return (
+      <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
+        Nenhum participante na liga.
+      </p>
+    );
+  }
 
   return (
     <div className="grid gap-8">
@@ -381,7 +415,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                   contentStyle={tooltipContentStyle}
                   labelStyle={tooltipLabelStyle}
                   itemStyle={tooltipItemStyle}
-                  cursor={tooltipCursorFill}
+                  cursor={chartColumnCursor(isDarkMode)}
                   formatter={(v) => [`${v} rodada(s)`, "Sem vencer"]}
                 />
                 <Bar
@@ -390,6 +424,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                   radius={[4, 4, 0, 0]}
                   name="Rodadas sem vitória"
                   shape={shapeJejum}
+                  activeBar={{ fill: activeBarFill(isDarkMode) }}
                 >
                   {droughtBarData.map((e, i) => (
                     <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
@@ -412,18 +447,19 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={top10DroughtHistoryData} margin={{ top: 8, right: 8, left: 0, bottom: 64 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
-                <XAxis dataKey="nome" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="categoria" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip
-                  content={DroughtHistoryTooltipContent}
+                  content={SequenceHistoryTooltip}
                   wrapperStyle={tooltipWrapperStyle}
-                  cursor={tooltipCursorFill}
+                  cursor={chartColumnCursor(isDarkMode)}
                 />
                 <Bar
-                  dataKey="jejum"
+                  dataKey="rodadas"
                   radius={[4, 4, 0, 0]}
                   name="Maior jejum"
                   shape={shapeJejum}
+                  activeBar={{ fill: activeBarFill(isDarkMode) }}
                 >
                   {top10DroughtHistoryData.map((e, i) => (
                     <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
@@ -446,25 +482,20 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={top10WinStreakHistoryData} margin={{ top: 8, right: 8, left: 0, bottom: 64 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
-                <XAxis dataKey="nome" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="categoria" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip
+                  content={SequenceHistoryTooltip}
                   wrapperStyle={tooltipWrapperStyle}
-                  contentStyle={tooltipContentStyle}
-                  labelStyle={tooltipLabelStyle}
-                  itemStyle={tooltipItemStyle}
-                  cursor={tooltipCursorFill}
-                  formatter={(v, _n, item) => {
-                    const p = (item?.payload as { periodo?: string } | undefined)?.periodo ?? "—";
-                    return [`${v} rodada(s)`, `Vitórias (${p})`];
-                  }}
+                  cursor={chartColumnCursor(isDarkMode)}
                 />
                 <Bar
-                  dataKey="sequencia"
+                  dataKey="rodadas"
                   fill="#059669"
                   radius={[4, 4, 0, 0]}
                   name="Sequência de vitórias"
                   shape={shapeSequenciaVitórias}
+                  activeBar={{ fill: activeBarFill(isDarkMode) }}
                 >
                   {top10WinStreakHistoryData.map((e, i) => (
                     <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
@@ -489,7 +520,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 contentStyle={tooltipContentStyle}
                 labelStyle={tooltipLabelStyle}
                 itemStyle={tooltipItemStyle}
-                cursor={tooltipCursorFill}
+                cursor={chartColumnCursor(isDarkMode)}
               />
               <Bar
                 dataKey="vitórias"
@@ -497,6 +528,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 radius={[4, 4, 0, 0]}
                 name="Vitórias"
                 shape={shapeVitórias}
+                activeBar={{ fill: activeBarFill(isDarkMode) }}
               >
                 {barData.map((e, i) => (
                   <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
@@ -521,11 +553,8 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
-                  contentStyle={tooltipContentStyle}
-                  labelStyle={tooltipLabelStyle}
-                  itemStyle={tooltipItemStyle}
-                  cursor={tooltipCursorFill}
-                  formatter={(v) => [moneyFmt(v), "Recebimentos"]}
+                  cursor={chartColumnCursor(isDarkMode)}
+                  content={(props) => <MoneySeriesTooltip {...props} kind="ganho" />}
                 />
                 <Bar
                   dataKey="valor"
@@ -533,6 +562,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                   radius={[4, 4, 0, 0]}
                   name="Recebimentos"
                   shape={shapeGanhos}
+                  activeBar={{ fill: activeBarFill(isDarkMode) }}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -552,11 +582,8 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
-                  contentStyle={tooltipContentStyle}
-                  labelStyle={tooltipLabelStyle}
-                  itemStyle={tooltipItemStyle}
-                  cursor={tooltipCursorFill}
-                  formatter={(v) => [moneyFmt(v), "Perdas"]}
+                  cursor={chartColumnCursor(isDarkMode)}
+                  content={(props) => <MoneySeriesTooltip {...props} kind="perda" />}
                 />
                 <Bar
                   dataKey="valor"
@@ -564,6 +591,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                   radius={[4, 4, 0, 0]}
                   name="Perdas"
                   shape={shapePerdas}
+                  activeBar={{ fill: activeBarFill(isDarkMode) }}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -581,14 +609,17 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
-                  contentStyle={tooltipContentStyle}
-                  labelStyle={tooltipLabelStyle}
-                  itemStyle={tooltipItemStyle}
-                  cursor={tooltipCursorFill}
-                  formatter={(v) => [moneyFmt(v), "Lucro"]}
+                  cursor={chartColumnCursor(isDarkMode)}
+                  content={(props) => <MoneySeriesTooltip {...props} kind="lucro" />}
                 />
                 <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
-                <Bar dataKey="valor" name="Lucro" radius={[4, 4, 0, 0]} shape={shapeLucro}>
+                <Bar
+                  dataKey="valor"
+                  name="Lucro"
+                  radius={[4, 4, 0, 0]}
+                  shape={shapeLucro}
+                  activeBar={{ fill: activeBarFill(isDarkMode) }}
+                >
                   {top5Lucros.map((e, i) => (
                     <Cell key={i} fill={e.valor >= 0 ? "#059669" : "#dc2626"} />
                   ))}
