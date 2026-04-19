@@ -90,7 +90,57 @@ const tooltipContentStyle = {
   border: "1px solid var(--color-zinc-200, #e4e4e7)",
   backgroundColor: "var(--background)",
   color: "var(--foreground)",
+  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06)",
 } as const;
+
+const tooltipLabelStyle = {
+  color: "var(--foreground)",
+  fontWeight: 600,
+  fontSize: 13,
+  marginBottom: 6,
+} as const;
+
+const tooltipItemStyle = {
+  color: "var(--foreground)",
+  fontSize: 13,
+  padding: "2px 0",
+} as const;
+
+const tooltipWrapperStyle = {
+  outline: "none",
+} as const;
+
+const tooltipCursorFill = { fill: "rgba(0, 0, 0, 0.06)" };
+
+type DroughtHistoryChartRow = {
+  userId: string;
+  nome: string;
+  nomeTime: string;
+  jejum: number;
+  periodo: string;
+  rank: number;
+};
+
+function DroughtHistoryTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: ReadonlyArray<{ payload?: DroughtHistoryChartRow }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+  return (
+    <div className="rounded-lg px-3 py-2 text-sm" style={tooltipContentStyle}>
+      <p style={tooltipLabelStyle}>{row.nomeTime}</p>
+      <p style={tooltipItemStyle}>
+        {row.jejum} rodada{row.jejum === 1 ? "" : "s"}
+      </p>
+      <p style={{ ...tooltipItemStyle, fontSize: 12, opacity: 0.75, marginTop: 4 }}>{row.periodo}</p>
+    </div>
+  );
+}
 
 // Paletas distintas por tema: escura no light, clara no dark.
 const TEAM_BAR_COLORS_LIGHT = [
@@ -178,6 +228,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
         .map((e, idx) => ({
           userId: e.userId,
           nome: shortLabel(e.displayName),
+          nomeTime: e.displayName.trim(),
           jejum: e.length,
           periodo: e.fromRound === e.toRound ? `rodada ${e.fromRound}` : `rodadas ${e.fromRound}-${e.toRound}`,
           rank: idx + 1,
@@ -326,7 +377,11 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip
+                  wrapperStyle={tooltipWrapperStyle}
                   contentStyle={tooltipContentStyle}
+                  labelStyle={tooltipLabelStyle}
+                  itemStyle={tooltipItemStyle}
+                  cursor={tooltipCursorFill}
                   formatter={(v) => [`${v} rodada(s)`, "Sem vencer"]}
                 />
                 <Bar
@@ -360,11 +415,9 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip
-                  contentStyle={tooltipContentStyle}
-                  formatter={(v, _n, item) => {
-                    const p = (item?.payload as { periodo?: string } | undefined)?.periodo ?? "—";
-                    return [`${v} rodada(s)`, `Jejum (${p})`];
-                  }}
+                  content={DroughtHistoryTooltipContent}
+                  wrapperStyle={tooltipWrapperStyle}
+                  cursor={tooltipCursorFill}
                 />
                 <Bar
                   dataKey="jejum"
@@ -396,7 +449,11 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip
+                  wrapperStyle={tooltipWrapperStyle}
                   contentStyle={tooltipContentStyle}
+                  labelStyle={tooltipLabelStyle}
+                  itemStyle={tooltipItemStyle}
+                  cursor={tooltipCursorFill}
                   formatter={(v, _n, item) => {
                     const p = (item?.payload as { periodo?: string } | undefined)?.periodo ?? "—";
                     return [`${v} rodada(s)`, `Vitórias (${p})`];
@@ -428,7 +485,11 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
               <XAxis dataKey="nome" angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
               <Tooltip
+                wrapperStyle={tooltipWrapperStyle}
                 contentStyle={tooltipContentStyle}
+                labelStyle={tooltipLabelStyle}
+                itemStyle={tooltipItemStyle}
+                cursor={tooltipCursorFill}
               />
               <Bar
                 dataKey="vitórias"
@@ -458,7 +519,14 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
-                <Tooltip formatter={(v) => [moneyFmt(v), "Recebimentos"]} />
+                <Tooltip
+                  wrapperStyle={tooltipWrapperStyle}
+                  contentStyle={tooltipContentStyle}
+                  labelStyle={tooltipLabelStyle}
+                  itemStyle={tooltipItemStyle}
+                  cursor={tooltipCursorFill}
+                  formatter={(v) => [moneyFmt(v), "Recebimentos"]}
+                />
                 <Bar
                   dataKey="valor"
                   fill="#059669"
@@ -482,7 +550,14 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
-                <Tooltip formatter={(v) => [moneyFmt(v), "Perdas"]} />
+                <Tooltip
+                  wrapperStyle={tooltipWrapperStyle}
+                  contentStyle={tooltipContentStyle}
+                  labelStyle={tooltipLabelStyle}
+                  itemStyle={tooltipItemStyle}
+                  cursor={tooltipCursorFill}
+                  formatter={(v) => [moneyFmt(v), "Perdas"]}
+                />
                 <Bar
                   dataKey="valor"
                   fill="#dc2626"
@@ -504,7 +579,14 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
-                <Tooltip formatter={(v) => [moneyFmt(v), "Lucro"]} />
+                <Tooltip
+                  wrapperStyle={tooltipWrapperStyle}
+                  contentStyle={tooltipContentStyle}
+                  labelStyle={tooltipLabelStyle}
+                  itemStyle={tooltipItemStyle}
+                  cursor={tooltipCursorFill}
+                  formatter={(v) => [moneyFmt(v), "Lucro"]}
+                />
                 <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                 <Bar dataKey="valor" name="Lucro" radius={[4, 4, 0, 0]} shape={shapeLucro}>
                   {top5Lucros.map((e, i) => (
@@ -538,7 +620,12 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
                   <Cell key={i} fill={barColorForUserId(e.userId, isDarkMode)} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip
+                wrapperStyle={tooltipWrapperStyle}
+                contentStyle={tooltipContentStyle}
+                labelStyle={tooltipLabelStyle}
+                itemStyle={tooltipItemStyle}
+              />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
