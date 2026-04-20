@@ -296,6 +296,73 @@ export function topDroughtHistoryEvents(
   return events.slice(0, limit);
 }
 
+/** Remove a rodada de maior `roundNumber` (a última na timeline canônica), para comparar ranking com o snapshot anterior. */
+export function roundsExcludingHighestRoundNumber(rounds: Round[]): Round[] {
+  if (rounds.length === 0) return [];
+  const maxNum = Math.max(...rounds.map((r) => r.roundNumber));
+  return rounds.filter((r) => r.roundNumber !== maxNum);
+}
+
+function droughtHistoryEntryKey(e: DroughtHistoryEntry): string {
+  return `${e.userId}|${e.fromRound}|${e.toRound}`;
+}
+
+/**
+ * Posição (1-based) do mesmo período de jejum na lista `prevTop` já ordenada como em `topDroughtHistoryEvents`,
+ * ou `null` se não havia entrada equivalente (ex.: estreia no top após nova rodada).
+ */
+export function findDroughtHistoryEntryPreviousRank(
+  curr: DroughtHistoryEntry,
+  prevTop: DroughtHistoryEntry[],
+  roundsPrev: Round[],
+): number | null {
+  if (prevTop.length === 0) return null;
+
+  const rankByKey = new Map<string, number>();
+  prevTop.forEach((p, idx) => {
+    rankByKey.set(droughtHistoryEntryKey(p), idx + 1);
+  });
+  const exact = rankByKey.get(droughtHistoryEntryKey(curr));
+  if (exact !== undefined) return exact;
+
+  const prevTimeline = canonicalRoundsTimeline(roundsPrev);
+  const prevLastRound =
+    prevTimeline.length > 0 ? prevTimeline[prevTimeline.length - 1].roundNumber : null;
+  if (prevLastRound === null) return null;
+
+  for (let idx = 0; idx < prevTop.length; idx++) {
+    const p = prevTop[idx];
+    if (
+      p.userId === curr.userId &&
+      p.fromRound === curr.fromRound &&
+      p.toRound === prevLastRound &&
+      curr.toRound > prevLastRound
+    ) {
+      return idx + 1;
+    }
+  }
+  return null;
+}
+
+export type DroughtHistoryRankTrend = "up" | "down" | "same" | "none";
+
+/** Compara posição no top atual vs. após excluir a última rodada da timeline (menor número = melhor). */
+export function droughtHistoryEntryRankTrend(
+  curr: DroughtHistoryEntry,
+  currRank1Based: number,
+  members: LeagueMember[],
+  rounds: Round[],
+  limit: number,
+): DroughtHistoryRankTrend {
+  const roundsPrev = roundsExcludingHighestRoundNumber(rounds);
+  const prevTop = topDroughtHistoryEvents(members, roundsPrev, limit).filter((e) => e.length > 1);
+  const prevRank = findDroughtHistoryEntryPreviousRank(curr, prevTop, roundsPrev);
+  if (prevRank === null) return "none";
+  if (currRank1Based < prevRank) return "up";
+  if (currRank1Based > prevRank) return "down";
+  return "same";
+}
+
 export type WinStreakHistoryEntry = DroughtHistoryEntry;
 
 /** Vitórias consecutivas nas rodadas da timeline; encerra quando o jogador não é campeão. */

@@ -6,10 +6,12 @@ import type { LeagueMember, Round } from "@/lib/types/api";
 import {
   computeConsecutiveWinsAtEnd,
   computeRoundsSinceLastWin,
+  droughtHistoryEntryRankTrend,
   formatBRL,
   receiptPerWin,
   topDroughtHistoryEvents,
   topWinStreakHistoryEvents,
+  type DroughtHistoryRankTrend,
   type SeasonPlayerLine,
 } from "@/lib/stats";
 
@@ -47,13 +49,67 @@ function StatIntro({ children }: { children: ReactNode }) {
   );
 }
 
-function LineRow({ label, value }: { label: string; value: ReactNode }) {
+function LineRow({
+  label,
+  value,
+  labelPrefix,
+}: {
+  label: string;
+  value: ReactNode;
+  labelPrefix?: ReactNode;
+}) {
   return (
     <div className={`flex flex-wrap items-baseline gap-x-2 ${STAT_ROW_LINE}`}>
-      <span className="min-w-0 flex-1 font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
+      <span className="min-w-0 flex-1 font-medium text-zinc-700 dark:text-zinc-300">
+        {labelPrefix != null ? (
+          <span className="mr-1 inline-flex w-4 shrink-0 align-[-0.125em]">{labelPrefix}</span>
+        ) : null}
+        {label}
+      </span>
       <span className="shrink-0 tabular-nums text-zinc-900 dark:text-zinc-100">{value}</span>
     </div>
   );
+}
+
+function DroughtRankTrendIcon({ trend }: { trend: DroughtHistoryRankTrend }) {
+  const common = "h-3.5 w-3.5 shrink-0";
+  if (trend === "up") {
+    return (
+      <svg
+        className={`${common} text-emerald-600 dark:text-emerald-400`}
+        viewBox="0 0 12 12"
+        fill="currentColor"
+        aria-hidden
+      >
+        <path d="M6 1.2 10.8 9H1.2Z" />
+      </svg>
+    );
+  }
+  if (trend === "down") {
+    return (
+      <svg
+        className={`${common} text-red-600 dark:text-red-400`}
+        viewBox="0 0 12 12"
+        fill="currentColor"
+        aria-hidden
+      >
+        <path d="M6 10.8 1.2 3H10.8Z" />
+      </svg>
+    );
+  }
+  if (trend === "same") {
+    return (
+      <svg
+        className={`${common} text-zinc-400 dark:text-zinc-500`}
+        viewBox="0 0 12 12"
+        fill="currentColor"
+        aria-hidden
+      >
+        <circle cx="6" cy="6" r="4" />
+      </svg>
+    );
+  }
+  return null;
 }
 
 /** Verde se positivo, vermelho se negativo, padrão se zero — recebimentos, perdas e lucro. */
@@ -282,9 +338,9 @@ export function LeagueStatsTextBlocks({
           <StatSection title="Histórico de maiores sequências de derrota">
             <StatIntro>
               <>
-                Períodos consecutivos sem vitória nas rodadas já registradas. Ao vencer, o período encerra e começa
+                Períodos consecutivos sem vitória nas rodadas registradas. Ao vencer, o período encerra e começa
                 nova contagem. Top 20 entre todos os jogadores e todos os períodos (o mesmo nome pode aparecer mais
-                de uma vez). (Mostra apenas sequências de derrota de 2+ rodadas.)
+                de uma vez, pois ele pode vencer uma rodada e iniciar um novo jejum logo após).
               </>
             </StatIntro>
             {rows.map((e, i) => {
@@ -292,9 +348,11 @@ export function LeagueStatsTextBlocks({
                 e.fromRound === e.toRound
                   ? `rodada ${e.fromRound}`
                   : `rodadas ${e.fromRound}–${e.toRound}`;
+              const trend = droughtHistoryEntryRankTrend(e, i + 1, members, rounds, 20);
               return (
                 <LineRow
                   key={`${e.userId}-${e.fromRound}-${e.toRound}-${i}`}
+                  labelPrefix={<DroughtRankTrendIcon trend={trend} />}
                   label={`${pad2(i + 1)}. ${e.displayName}`}
                   value={`${e.length} rodadas (${roundsSpan})`}
                 />

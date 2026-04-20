@@ -185,13 +185,13 @@ function MoneySeriesTooltip({
 }
 
 // Paletas distintas por tema: escura no light, clara no dark.
-const TEAM_BAR_COLORS_LIGHT = [
+const TEAM_BAR_COLORS_DARK = [
   "#b91c1c", "#166534", "#a16207", "#1d4ed8", "#c2410c",
   "#7e22ce", "#0f766e", "#be185d", "#4d7c0f", "#9d174d",
   "#155e75", "#6d28d9", "#92400e", "#9f1239", "#7f1d1d",
   "#0f766e", "#3f6212", "#9a3412", "#312e81", "#374151",
 ] as const;
-const TEAM_BAR_COLORS_DARK = [
+const TEAM_BAR_COLORS_LIGHT = [
   "#fca5a5", "#86efac", "#fde047", "#93c5fd", "#fdba74",
   "#d8b4fe", "#5eead4", "#f9a8d4", "#bef264", "#fda4af",
   "#67e8f9", "#c4b5fd", "#fcd34d", "#fda4af", "#fca5a5",
