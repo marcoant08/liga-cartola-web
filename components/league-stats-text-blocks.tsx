@@ -326,12 +326,11 @@ export function LeagueStatsTextBlocks({
         {members.length === 0 ? (
           <p className="py-1.5 text-zinc-500">Nenhum membro na liga.</p>
         ) : (
-          winDroughtRows.map((row) => (
+          winDroughtRows.filter((row) => !deserterIds.has(row.userId)).map((row) => (
             <LineRow
               key={row.userId}
               label={row.displayName}
               value={formatWinDroughtValue(row, players, registeredRoundsCount)}
-              strikethrough={deserterIds.has(row.userId)}
             />
           ))
         )}
@@ -514,7 +513,7 @@ export function LeagueStatsTextBlocks({
       </StatSection>
 
       {deserters.length > 0 && (
-        <StatSection title="🏳️ Desertores">
+        <StatSection title="🏳️ Desertores safados">
           <StatIntro>
             Membros que desistiram da liga. A partir da rodada de desistência, não entram mais nos cálculos de ganhos, perdas e lucros.
           </StatIntro>
