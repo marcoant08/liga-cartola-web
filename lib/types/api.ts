@@ -26,6 +26,13 @@ export type Round = {
   registeredAt: string;
 };
 
+export type Deserter = {
+  memberId: string;
+  memberName: string;
+  desertedAtRound: number;
+  registeredAt: string;
+};
+
 export type League = {
   id: string;
   name: string;
@@ -38,6 +45,7 @@ export type League = {
   inviteTokenExpiresAt?: string;
   members: LeagueMember[];
   rounds: Round[];
+  deserters: Deserter[];
   createdAt: string;
   updatedAt: string;
 };

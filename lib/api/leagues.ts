@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
-import type { League, LeagueMember, Round } from "@/lib/types/api";
+import type { Deserter, League, LeagueMember, Round } from "@/lib/types/api";
 
 export const leaguesApi = {
   list() {
@@ -74,5 +74,18 @@ export const leaguesApi = {
 
   getRounds(leagueId: string) {
     return apiFetch<{ rounds: Round[] }>(`/leagues/${leagueId}/rounds`);
+  },
+
+  addDeserter(leagueId: string, body: { memberId: string; desertedAtRound: number }) {
+    return apiFetch<Deserter>(`/leagues/${leagueId}/deserters`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  removeDeserter(leagueId: string, memberId: string) {
+    return apiFetch<League>(`/leagues/${leagueId}/deserters/${memberId}`, {
+      method: "DELETE",
+    });
   },
 };

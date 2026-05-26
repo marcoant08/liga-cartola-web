@@ -43,6 +43,9 @@ export default function LeagueDetailPage() {
   const [roundNumber, setRoundNumber] = useState("1");
   const [winnerId, setWinnerId] = useState("");
 
+  const [deserterId, setDeserterId] = useState("");
+  const [deserterRound, setDeserterRound] = useState("1");
+
   const [inviteInfo, setInviteInfo] = useState<{ inviteToken: string; expiresAt: string } | null>(
     null,
   );
@@ -134,6 +137,36 @@ export default function LeagueDetailPage() {
     },
     onError: (err) => {
       if (err instanceof ApiError) setFormError(err.message);
+    },
+  });
+
+  const addDeserterMutation = useMutation({
+    mutationFn: () =>
+      leaguesApi.addDeserter(id, {
+        memberId: deserterId,
+        desertedAtRound: Number(deserterRound),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["league", id] });
+      setDeserterId("");
+      setDeserterRound("1");
+      setFormError(null);
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) setFormError(err.message);
+      else setFormError("Erro ao registrar desertor.");
+    },
+  });
+
+  const removeDeserterMutation = useMutation({
+    mutationFn: (memberId: string) => leaguesApi.removeDeserter(id, memberId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["league", id] });
+      setFormError(null);
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) setFormError(err.message);
+      else setFormError("Erro ao remover desertor.");
     },
   });
 
@@ -516,6 +549,100 @@ export default function LeagueDetailPage() {
                 {registerRoundMutation.isPending ? "Salvando…" : "Registrar"}
               </button>
             </form>
+          </div>
+
+          <div className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-700">
+            <h3 className="font-medium">Registrar desertor</h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              Marque um membro que desistiu da liga. A partir da rodada indicada, ele não entra mais nos cálculos de estatísticas.
+            </p>
+            <form
+              className="mt-3 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!deserterId) return;
+                addDeserterMutation.mutate();
+              }}
+            >
+              <label className="w-full text-sm font-medium md:w-auto">
+                Membro
+                <select
+                  required
+                  value={deserterId}
+                  onChange={(e) => setDeserterId(e.target.value)}
+                  className="mt-1 block w-full min-w-[200px] rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-950 md:w-auto"
+                >
+                  <option value="">Selecione…</option>
+                  {members
+                    .filter(
+                      (m) =>
+                        m.userId !== league.adminId &&
+                        !(league.deserters ?? []).some((d) => d.memberId === m.userId),
+                    )
+                    .map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.teamName} ({m.userName}
+                        {m.isGuest ? ", convidado" : ""})
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="w-full text-sm font-medium md:w-auto">
+                Rodada de desistência (1–{SEASON_TOTAL_ROUNDS})
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={SEASON_TOTAL_ROUNDS}
+                  value={deserterRound}
+                  onChange={(e) => setDeserterRound(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-950 md:w-32"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={addDeserterMutation.isPending}
+                className="w-full rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 md:w-auto"
+              >
+                {addDeserterMutation.isPending ? "Registrando…" : "Registrar desertor"}
+              </button>
+            </form>
+
+            {(league.deserters ?? []).length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Desertores registrados:</p>
+                <ul className="mt-2 divide-y divide-zinc-200 rounded-xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+                  {(league.deserters ?? []).map((d) => (
+                    <li
+                      key={d.memberId}
+                      className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+                    >
+                      <div>
+                        <span className="font-medium">{d.memberName}</span>
+                        <span className="ml-2 text-sm text-zinc-500">
+                          desistiu na rodada {d.desertedAtRound}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Remover ${d.memberName} da lista de desertores?`,
+                            )
+                          ) {
+                            removeDeserterMutation.mutate(d.memberId);
+                          }
+                        }}
+                        className="text-sm text-red-600 hover:underline dark:text-red-400"
+                      >
+                        Remover
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </section>
       )}

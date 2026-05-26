@@ -1,4 +1,4 @@
-import type { LeagueMember, Round } from "@/lib/types/api";
+import type { Deserter, LeagueMember, Round } from "@/lib/types/api";
 
 export type WinnerStatsRow = {
   winnerId: string;
@@ -18,23 +18,36 @@ export function receiptPerWin(memberCount: number, roundValue: number): number {
   return (n - 1) * rv;
 }
 
-/** Recebimento estimado = vitórias × (participantes − 1) × valor da rodada. */
+/**
+ * Recebimento estimado por rodada considerando desertores.
+ * O prêmio de cada vitória é (participantes ativos naquela rodada − 1) × valor da rodada.
+ */
 export function aggregateWinnerStats(
   rounds: Round[],
   roundValue: number,
   members: LeagueMember[],
+  deserters: Deserter[] = [],
 ): WinnerStatsRow[] {
   const teamByUserId = new Map(members.map((m) => [m.userId, m.teamName]));
-  const byWinner = new Map<string, { displayName: string; wins: number }>();
-  const perWin = receiptPerWin(members.length, roundValue);
+  const deserterMap = new Map(deserters.map((d) => [d.memberId, d.desertedAtRound]));
+  const rv = Number(roundValue);
+  const byWinner = new Map<string, { displayName: string; wins: number; prize: number }>();
 
-  for (const r of rounds) {
+  const timeline = canonicalRoundsTimeline(rounds);
+
+  for (const r of timeline) {
+    const activeCount = members.filter(
+      (m) => r.roundNumber < memberRoundCutoff(m.userId, deserterMap),
+    ).length;
+    const perWinThisRound = activeCount >= 2 ? (activeCount - 1) * rv : 0;
+
     const fromMember = teamByUserId.get(r.winnerId);
     const displayName = (fromMember && fromMember.trim()) || r.winnerName || r.winnerId;
-    const cur = byWinner.get(r.winnerId) ?? { displayName, wins: 0 };
+    const cur = byWinner.get(r.winnerId) ?? { displayName, wins: 0, prize: 0 };
     byWinner.set(r.winnerId, {
       displayName: cur.displayName || displayName,
       wins: cur.wins + 1,
+      prize: cur.prize + perWinThisRound,
     });
   }
 
@@ -43,7 +56,7 @@ export function aggregateWinnerStats(
       winnerId,
       displayName: v.displayName,
       wins: v.wins,
-      estimatedPrize: v.wins * perWin,
+      estimatedPrize: v.prize,
     }))
     .sort((a, b) => b.wins - a.wins);
 }
@@ -88,6 +101,7 @@ export type SeasonPlayerLine = {
   displayName: string;
   wins: number;
   roundsWon: number[];
+  roundsParticipated: number;
   recebimentos: number;
   perdas: number;
   lucro: number;
@@ -104,55 +118,98 @@ export function formatBRL(value: number): string {
 }
 
 /**
+ * Retorna a rodada-limite (exclusiva) para um membro: rodadas com `roundNumber < limite` contam.
+ * Desertores com `desertedAtRound = N` participam até a rodada N-1.
+ * Membros normais não têm limite (Infinity).
+ */
+function memberRoundCutoff(
+  userId: string,
+  deserterMap: Map<string, number>,
+): number {
+  const desertedAt = deserterMap.get(userId);
+  return desertedAt != null ? desertedAt : Infinity;
+}
+
+/**
  * Fluxo financeiro (somente rodadas já registradas na liga):
  * - Por vitória: campeão recebe (n − 1) × valor da rodada (cada perdedor paga esse valor).
  * - Em cada rodada registrada em que não venceu: paga `valor da rodada` ao campeão.
  * - Recebimentos = vitórias × (n − 1) × valor da rodada.
  * - Perdas = −(rodadas registradas − vitórias) × valor da rodada.
  * - Lucro = recebimentos + perdas.
+ *
+ * Desertores: um membro que desistiu na rodada N só participa até a rodada N-1.
+ * A partir da rodada N, não paga nem recebe.
+ * O número de participantes ativos por rodada é recalculado para cada rodada.
  */
 export function computeSeasonPlayerLines(
   members: LeagueMember[],
   rounds: Round[],
   roundValue: number,
+  deserters: Deserter[] = [],
 ): SeasonPlayerLine[] {
   const n = members.length;
   const rv = Number(roundValue);
   if (n === 0 || !Number.isFinite(rv) || rv <= 0) return [];
 
-  const perWin = receiptPerWin(n, rv);
+  const deserterMap = new Map(deserters.map((d) => [d.memberId, d.desertedAtRound]));
+
+  const timeline = canonicalRoundsTimeline(rounds);
+
+  const recebimentosByUser = new Map<string, number>();
+  const perdasByUser = new Map<string, number>();
   const winsByUser = new Map<string, number>();
   const roundsWonByUser = new Map<string, number[]>();
+  const roundsParticipatedByUser = new Map<string, number>();
 
-  for (const r of rounds) {
-    const id = r.winnerId;
-    winsByUser.set(id, (winsByUser.get(id) ?? 0) + 1);
-    const arr = roundsWonByUser.get(id) ?? [];
-    arr.push(r.roundNumber);
-    roundsWonByUser.set(id, arr);
+  for (const r of timeline) {
+    const activeMembers = members.filter(
+      (m) => r.roundNumber < memberRoundCutoff(m.userId, deserterMap),
+    );
+    const activeCount = activeMembers.length;
+    if (activeCount < 2) continue;
+
+    const perWinThisRound = (activeCount - 1) * rv;
+
+    for (const m of activeMembers) {
+      const participated = (roundsParticipatedByUser.get(m.userId) ?? 0) + 1;
+      roundsParticipatedByUser.set(m.userId, participated);
+
+      if (r.winnerId === m.userId) {
+        winsByUser.set(m.userId, (winsByUser.get(m.userId) ?? 0) + 1);
+        const arr = roundsWonByUser.get(m.userId) ?? [];
+        arr.push(r.roundNumber);
+        roundsWonByUser.set(m.userId, arr);
+        recebimentosByUser.set(
+          m.userId,
+          (recebimentosByUser.get(m.userId) ?? 0) + perWinThisRound,
+        );
+      } else {
+        perdasByUser.set(m.userId, (perdasByUser.get(m.userId) ?? 0) - rv);
+      }
+    }
   }
+
   for (const arr of roundsWonByUser.values()) {
     arr.sort((a, b) => a - b);
   }
-
-  const registeredRounds = rounds.length;
 
   const lines: SeasonPlayerLine[] = members.map((m) => {
     const wins = winsByUser.get(m.userId) ?? 0;
     const roundsWon = roundsWonByUser.get(m.userId) ?? [];
     const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
-    const recebimentos = wins * perWin;
-    const perdas =
-      registeredRounds > 0 ? -(registeredRounds - wins) * rv : 0;
+    const recebimentos = recebimentosByUser.get(m.userId) ?? 0;
+    const perdas = perdasByUser.get(m.userId) ?? 0;
     const lucro = recebimentos + perdas;
-    const pctVitórias =
-      registeredRounds > 0 ? (wins / registeredRounds) * 100 : 0;
+    const participated = roundsParticipatedByUser.get(m.userId) ?? 0;
+    const pctVitórias = participated > 0 ? (wins / participated) * 100 : 0;
 
     return {
       userId: m.userId,
       displayName,
       wins,
       roundsWon,
+      roundsParticipated: participated,
       recebimentos,
       perdas,
       lucro,
@@ -197,18 +254,22 @@ export type WinDroughtRow = {
 export function computeRoundsSinceLastWin(
   members: LeagueMember[],
   rounds: Round[],
+  deserters: Deserter[] = [],
 ): WinDroughtRow[] {
   if (members.length === 0) return [];
   const sorted = canonicalRoundsTimeline(rounds);
+  const deserterMap = new Map(deserters.map((d) => [d.memberId, d.desertedAtRound]));
 
   const rows: WinDroughtRow[] = members.map((m) => {
     const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
-    if (sorted.length === 0) {
+    const cutoff = memberRoundCutoff(m.userId, deserterMap);
+    const memberRounds = sorted.filter((r) => r.roundNumber < cutoff);
+    if (memberRounds.length === 0) {
       return { userId: m.userId, displayName, roundsSinceLastWin: 0 };
     }
     let count = 0;
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      if (sorted[i].winnerId === m.userId) break;
+    for (let i = memberRounds.length - 1; i >= 0; i--) {
+      if (memberRounds[i].winnerId === m.userId) break;
       count++;
     }
     return { userId: m.userId, displayName, roundsSinceLastWin: count };
@@ -232,23 +293,28 @@ export type DroughtHistoryEntry = {
   toRound: number;
 };
 
-/** Jejuns consecutivos sem vitória (rodadas da timeline canônica); encerra ao vencer ou ao fim dos dados. */
+/** Jejuns consecutivos sem vitória (rodadas da timeline canônica); encerra ao vencer, ao desistir, ou ao fim dos dados. */
 export function computeDroughtHistoryEvents(
   members: LeagueMember[],
   rounds: Round[],
+  deserters: Deserter[] = [],
 ): DroughtHistoryEntry[] {
   const timeline = canonicalRoundsTimeline(rounds);
   if (members.length === 0 || timeline.length === 0) return [];
 
+  const deserterMap = new Map(deserters.map((d) => [d.memberId, d.desertedAtRound]));
   const out: DroughtHistoryEntry[] = [];
 
   for (const m of members) {
     const displayName = (m.teamName?.trim() || m.userName || m.userId).trim();
+    const cutoff = memberRoundCutoff(m.userId, deserterMap);
     let streak = 0;
     let fromRound = 0;
     let toRound = 0;
 
     for (const r of timeline) {
+      if (r.roundNumber >= cutoff) break;
+
       if (r.winnerId === m.userId) {
         if (streak > 0) {
           out.push({
@@ -285,8 +351,9 @@ export function topDroughtHistoryEvents(
   members: LeagueMember[],
   rounds: Round[],
   limit = 10,
+  deserters: Deserter[] = [],
 ): DroughtHistoryEntry[] {
-  const events = computeDroughtHistoryEvents(members, rounds);
+  const events = computeDroughtHistoryEvents(members, rounds, deserters);
   events.sort((a, b) => {
     if (b.length !== a.length) return b.length - a.length;
     if (b.toRound !== a.toRound) return b.toRound - a.toRound;

@@ -18,7 +18,7 @@ import {
   YAxis,
   type BarShapeProps,
 } from "recharts";
-import type { LeagueMember, Round } from "@/lib/types/api";
+import type { Deserter, LeagueMember, Round } from "@/lib/types/api";
 import {
   aggregateWinnerStats,
   computeRoundsSinceLastWin,
@@ -214,10 +214,11 @@ type Props = {
   rounds: Round[];
   roundValue: number;
   members: LeagueMember[];
+  deserters?: Deserter[];
   players: SeasonPlayerLine[];
 };
 
-export function LeagueStatsCharts({ rounds, roundValue, members, players }: Props) {
+export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [], players }: Props) {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -229,8 +230,8 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
   }, []);
 
   const ranking = useMemo(
-    () => aggregateWinnerStats(rounds, roundValue, members),
-    [rounds, roundValue, members],
+    () => aggregateWinnerStats(rounds, roundValue, members, deserters),
+    [rounds, roundValue, members, deserters],
   );
 
   const barData = useMemo(
@@ -255,17 +256,17 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
 
   const droughtBarData = useMemo(
     () =>
-      computeRoundsSinceLastWin(members, rounds).map((r) => ({
+      computeRoundsSinceLastWin(members, rounds, deserters).map((r) => ({
         userId: r.userId,
         nome: shortLabel(r.displayName),
         jejum: r.roundsSinceLastWin,
       })),
-    [members, rounds],
+    [members, rounds, deserters],
   );
 
   const top10DroughtHistoryData = useMemo(
     () =>
-      topDroughtHistoryEvents(members, rounds, 10)
+      topDroughtHistoryEvents(members, rounds, 10, deserters)
         .filter((e) => e.length > 1)
         .map((e, idx) => ({
           userId: e.userId,
@@ -277,7 +278,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, players }: Prop
               ? `Rodada ${e.fromRound}`
               : `Rodadas ${e.fromRound}–${e.toRound}`,
         })),
-    [members, rounds],
+    [members, rounds, deserters],
   );
 
   const top10WinStreakHistoryData = useMemo(

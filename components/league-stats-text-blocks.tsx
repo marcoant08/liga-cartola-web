@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useMemo } from "react";
-import type { LeagueMember, Round } from "@/lib/types/api";
+import type { Deserter, LeagueMember, Round } from "@/lib/types/api";
 import {
   computeConsecutiveWinsAtEnd,
   computeRoundsSinceLastWin,
@@ -53,20 +53,22 @@ function LineRow({
   label,
   value,
   labelPrefix,
+  strikethrough,
 }: {
   label: string;
   value: ReactNode;
   labelPrefix?: ReactNode;
+  strikethrough?: boolean;
 }) {
   return (
     <div className={`flex flex-wrap items-baseline gap-x-2 ${STAT_ROW_LINE}`}>
-      <span className="min-w-0 flex-1 font-medium text-zinc-700 dark:text-zinc-300">
+      <span className={`min-w-0 flex-1 font-medium text-zinc-700 dark:text-zinc-300${strikethrough ? " line-through opacity-60" : ""}`}>
         {labelPrefix != null ? (
           <span className="mr-1 inline-flex w-4 shrink-0 align-[-0.125em]">{labelPrefix}</span>
         ) : null}
         {label}
       </span>
-      <span className="shrink-0 tabular-nums text-zinc-900 dark:text-zinc-100">{value}</span>
+      <span className={`shrink-0 tabular-nums text-zinc-900 dark:text-zinc-100${strikethrough ? " line-through opacity-60" : ""}`}>{value}</span>
     </div>
   );
 }
@@ -142,6 +144,7 @@ type Props = {
   memberCount: number;
   members: LeagueMember[];
   rounds: Round[];
+  deserters: Deserter[];
   registeredRoundsCount: number;
   players: SeasonPlayerLine[];
   winnerByRound: Map<number, string>;
@@ -153,16 +156,17 @@ export function LeagueStatsTextBlocks({
   memberCount,
   members,
   rounds,
+  deserters,
   registeredRoundsCount,
   players,
   winnerByRound,
   lastRound,
 }: Props) {
-  const winDroughtRows = useMemo(() => computeRoundsSinceLastWin(members, rounds), [members, rounds]);
+  const winDroughtRows = useMemo(() => computeRoundsSinceLastWin(members, rounds, deserters), [members, rounds, deserters]);
 
   const topDroughtHistory = useMemo(
-    () => topDroughtHistoryEvents(members, rounds, 20),
-    [members, rounds],
+    () => topDroughtHistoryEvents(members, rounds, 20, deserters),
+    [members, rounds, deserters],
   );
 
   const consecutiveWinsAtEndRows = useMemo(
@@ -176,6 +180,8 @@ export function LeagueStatsTextBlocks({
   );
 
   const podium = players.filter((p) => p.wins > 0).slice(0, 3);
+  const hasDeserters = deserters.length > 0;
+  const deserterIds = new Set(deserters.map((d) => d.memberId));
   const receitaPorVitória = receiptPerWin(memberCount, roundValue);
   const membersByTeam = [...members].sort((a, b) => {
     const ta = (a.teamName?.trim() || a.userName).toLowerCase();
@@ -190,7 +196,7 @@ export function LeagueStatsTextBlocks({
   });
 
   const derrotasCount = (p: SeasonPlayerLine) =>
-    registeredRoundsCount === 0 ? 0 : registeredRoundsCount - p.wins;
+    p.roundsParticipated === 0 ? 0 : p.roundsParticipated - p.wins;
 
   /** Mais derrotas primeiro (rodadas em que não venceu). */
   const playersByDerrotasDesc = [...players].sort((a, b) => {
@@ -210,7 +216,7 @@ export function LeagueStatsTextBlocks({
             {podium.map((p, i) => (
               <li key={p.userId} className={`text-base ${STAT_ROW_LINE}`}>
                 {MEDALS[i]}{" "}
-                <span className="font-medium">
+                <span className={`font-medium${deserterIds.has(p.userId) ? " line-through opacity-60" : ""}`}>
                   {p.displayName} ({pad2(p.wins)} vitória{p.wins === 1 ? "" : "s"})
                 </span>
               </li>
@@ -227,7 +233,7 @@ export function LeagueStatsTextBlocks({
             {membersByTeam.map((m) => {
               const nomeTime = (m.teamName?.trim() || m.userName || "—").trim();
               return (
-                <li key={m.userId} className={STAT_ROW_LINE}>
+                <li key={m.userId} className={`${STAT_ROW_LINE}${deserterIds.has(m.userId) ? " line-through opacity-60" : ""}`}>
                   <span className="font-medium text-zinc-900 dark:text-zinc-100">{nomeTime}</span>
                   <span className="text-zinc-500"> → </span>
                   <span>{m.userName}</span>
@@ -266,7 +272,7 @@ export function LeagueStatsTextBlocks({
         ) : (
           <ol className="list-none">
             {players.map((p, idx) => (
-              <li key={p.userId} className={STAT_ROW_LINE}>
+              <li key={p.userId} className={`${STAT_ROW_LINE}${deserterIds.has(p.userId) ? " line-through opacity-60" : ""}`}>
                 <span className="tabular-nums text-zinc-500">{pad2(idx + 1)}.</span>{" "}
                 {p.displayName}
               </li>
@@ -297,7 +303,7 @@ export function LeagueStatsTextBlocks({
         ) : (
           <ul className="list-none">
             {players.map((p) => (
-              <li key={p.userId} className={STAT_ROW_LINE}>
+              <li key={p.userId} className={`${STAT_ROW_LINE}${deserterIds.has(p.userId) ? " line-through opacity-60" : ""}`}>
                 <span className="font-medium">{p.displayName}</span>
                 {" → "}
                 {p.roundsWon.length > 0 ? p.roundsWon.join(", ") : "❌"}
@@ -325,6 +331,7 @@ export function LeagueStatsTextBlocks({
               key={row.userId}
               label={row.displayName}
               value={formatWinDroughtValue(row, players, registeredRoundsCount)}
+              strikethrough={deserterIds.has(row.userId)}
             />
           ))
         )}
@@ -355,6 +362,7 @@ export function LeagueStatsTextBlocks({
                   labelPrefix={<DroughtRankTrendIcon trend={trend} />}
                   label={`${pad2(i + 1)}. ${e.displayName}`}
                   value={`${e.length} rodadas (${roundsSpan})`}
+                  strikethrough={deserterIds.has(e.userId)}
                 />
               );
             })}
@@ -385,6 +393,7 @@ export function LeagueStatsTextBlocks({
                   key={`${e.userId}-${e.fromRound}-${e.toRound}-${i}`}
                   label={`${pad2(i + 1)}. ${e.displayName}`}
                   value={`${e.length} rodadas (${roundsSpan})`}
+                  strikethrough={deserterIds.has(e.userId)}
                 />
               );
             })}
@@ -398,6 +407,7 @@ export function LeagueStatsTextBlocks({
             key={p.userId}
             label={p.displayName}
             value={String(p.wins)}
+            strikethrough={deserterIds.has(p.userId)}
           />
         ))}
       </StatSection>
@@ -406,6 +416,10 @@ export function LeagueStatsTextBlocks({
         <StatIntro>
           {registeredRoundsCount === 0 ? (
             <>Sem rodadas cadastradas — todos com 0 derrotas.</>
+          ) : hasDeserters ? (
+            <>
+              Conta só rodadas em que o jogador estava ativo. Desertores contam apenas rodadas anteriores à desistência (rodadas participadas − vitórias).
+            </>
           ) : (
             <>
               Conta só rodadas <strong>já registradas</strong> ({registeredRoundsCount}): em cada uma, quem não
@@ -421,6 +435,7 @@ export function LeagueStatsTextBlocks({
               key={p.userId}
               label={p.displayName}
               value={String(derrotasCount(p))}
+              strikethrough={deserterIds.has(p.userId)}
             />
           ))
         )}
@@ -430,6 +445,10 @@ export function LeagueStatsTextBlocks({
         <StatIntro>
           {registeredRoundsCount === 0 ? (
             <>Sem rodadas cadastradas — todos com 0%.</>
+          ) : hasDeserters ? (
+            <>
+              Vitórias ÷ rodadas em que o jogador estava ativo. Desertores usam apenas rodadas anteriores à desistência.
+            </>
           ) : (
             <>
               Com base em <strong>{registeredRoundsCount}</strong> rodada
@@ -443,19 +462,23 @@ export function LeagueStatsTextBlocks({
             key={p.userId}
             label={p.displayName}
             value={`${p.pctVitórias.toFixed(1)}%`}
+            strikethrough={deserterIds.has(p.userId)}
           />
         ))}
       </StatSection>
 
       <StatSection title="💰 Recebimentos">
         <StatIntro>
-          {`Por vitória o campeão recebe R$ ${receitaPorVitória.toFixed(2)} = (${memberCount} − 1) × R$ ${roundValue.toFixed(2)} (cada perdedor paga R$ ${roundValue.toFixed(2)}). Total = vitórias × esse valor.`}
+          {hasDeserters
+            ? `Por vitória o campeão recebe (participantes ativos na rodada − 1) × R$ ${roundValue.toFixed(2)}. Como há desertores, o número de participantes varia por rodada.`
+            : `Por vitória o campeão recebe R$ ${receitaPorVitória.toFixed(2)} = (${memberCount} − 1) × R$ ${roundValue.toFixed(2)} (cada perdedor paga R$ ${roundValue.toFixed(2)}). Total = vitórias × esse valor.`}
         </StatIntro>
         {players.map((p) => (
           <LineRow
             key={p.userId}
             label={p.displayName}
             value={moneyValueNode(p.recebimentos)}
+            strikethrough={deserterIds.has(p.userId)}
           />
         ))}
       </StatSection>
@@ -464,13 +487,16 @@ export function LeagueStatsTextBlocks({
         <StatIntro>
           {registeredRoundsCount === 0
             ? "Sem rodadas registradas — sem perdas contabilizadas."
-            : `Só entram rodadas já registradas (${registeredRoundsCount}). Em cada uma em que não venceu, paga R$ ${roundValue.toFixed(2)} ao campeão: −(${registeredRoundsCount} − vitórias) × R$ ${roundValue.toFixed(2)}.`}
+            : hasDeserters
+              ? `Só entram rodadas em que o jogador estava ativo. Em cada uma em que não venceu, paga R$ ${roundValue.toFixed(2)} ao campeão. Desertores contam apenas rodadas anteriores à desistência.`
+              : `Só entram rodadas já registradas (${registeredRoundsCount}). Em cada uma em que não venceu, paga R$ ${roundValue.toFixed(2)} ao campeão: −(${registeredRoundsCount} − vitórias) × R$ ${roundValue.toFixed(2)}.`}
         </StatIntro>
         {playersByPerdasDesc.map((p) => (
           <LineRow
             key={p.userId}
             label={p.displayName}
             value={moneyValueNode(p.perdas)}
+            strikethrough={deserterIds.has(p.userId)}
           />
         ))}
       </StatSection>
@@ -482,9 +508,25 @@ export function LeagueStatsTextBlocks({
             key={p.userId}
             label={p.displayName}
             value={moneyValueNode(p.lucro)}
+            strikethrough={deserterIds.has(p.userId)}
           />
         ))}
       </StatSection>
+
+      {deserters.length > 0 && (
+        <StatSection title="🏳️ Desertores">
+          <StatIntro>
+            Membros que desistiram da liga. A partir da rodada de desistência, não entram mais nos cálculos de ganhos, perdas e lucros.
+          </StatIntro>
+          {deserters.map((d) => (
+            <LineRow
+              key={d.memberId}
+              label={d.memberName}
+              value={`Desistiu na rodada ${d.desertedAtRound}`}
+            />
+          ))}
+        </StatSection>
+      )}
     </>
   );
 }

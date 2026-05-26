@@ -37,9 +37,10 @@ export default function LeagueStatsPage() {
     }
     const members = league.members ?? [];
     const rounds = league.rounds ?? [];
+    const deserters = league.deserters ?? [];
     const roundValue = Number(league.roundValue);
     return {
-      players: computeSeasonPlayerLines(members, rounds, roundValue),
+      players: computeSeasonPlayerLines(members, rounds, roundValue, deserters),
       winnerByRound: buildWinnerByRound(rounds),
       lastRound: getLastRegisteredRound(rounds),
     };
@@ -51,6 +52,7 @@ export default function LeagueStatsPage() {
       league.rounds ?? [],
       Number(league.roundValue),
       league.members ?? [],
+      league.deserters ?? [],
     );
   }, [league]);
 
@@ -67,6 +69,7 @@ export default function LeagueStatsPage() {
 
   const members = league?.members ?? [];
   const rounds = league?.rounds ?? [];
+  const deserters = league?.deserters ?? [];
   const roundValue = Number(league?.roundValue ?? 0);
   const leader = ranking[0];
   const totalRounds = rounds.length;
@@ -121,13 +124,17 @@ export default function LeagueStatsPage() {
       <div className="mt-2 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
         <p>
           Valor da rodada: <strong>R$ {roundValue.toFixed(2)}</strong> · {members.length} participante
-          {members.length === 1 ? "" : "s"}.
+          {members.length === 1 ? "" : "s"}
+          {deserters.length > 0 ? ` (${deserters.length} desertor${deserters.length === 1 ? "" : "es"})` : ""}.
         </p>
         <p>
           O <strong>valor da rodada</strong> é o que cada <strong>perdedor</strong> paga ao campeão. O campeão
-          recebe <strong>(participantes − 1) × valor da rodada</strong> por vitória. <strong>Perdas</strong> e{" "}
-          <strong>lucros</strong> consideram apenas as rodadas <strong>já registradas</strong> na liga. O
-          percentual de vitórias também usa só essas rodadas.
+          recebe <strong>(participantes ativos na rodada − 1) × valor da rodada</strong> por vitória.{" "}
+          {deserters.length > 0 && (
+            <>Desertores só participam até a rodada anterior à desistência.{" "}</>
+          )}
+          <strong>Perdas</strong> e <strong>lucros</strong> consideram apenas as rodadas{" "}
+          <strong>já registradas</strong> na liga. O percentual de vitórias também usa só essas rodadas.
         </p>
       </div>
 
@@ -154,7 +161,7 @@ export default function LeagueStatsPage() {
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Maior recebimento (vitórias × (n − 1) × valor)
+            Maior recebimento
           </p>
           <p className="mt-1 text-2xl font-semibold">
             {leader ? `R$ ${leader.estimatedPrize.toFixed(2)}` : "—"}
@@ -195,6 +202,7 @@ export default function LeagueStatsPage() {
         memberCount={members.length}
         members={members}
         rounds={rounds}
+        deserters={deserters}
         registeredRoundsCount={rounds.length}
         players={seasonStats.players}
         winnerByRound={seasonStats.winnerByRound}
@@ -207,6 +215,7 @@ export default function LeagueStatsPage() {
           rounds={rounds}
           roundValue={roundValue}
           members={members}
+          deserters={deserters}
           players={seasonStats.players}
         />
       </div>
