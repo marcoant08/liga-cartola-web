@@ -254,14 +254,18 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
     }));
   }, [ranking, rounds.length]);
 
+  const deserterIds = useMemo(() => new Set(deserters.map((d) => d.memberId)), [deserters]);
+
   const droughtBarData = useMemo(
     () =>
-      computeRoundsSinceLastWin(members, rounds, deserters).map((r) => ({
-        userId: r.userId,
-        nome: shortLabel(r.displayName),
-        jejum: r.roundsSinceLastWin,
-      })),
-    [members, rounds, deserters],
+      computeRoundsSinceLastWin(members, rounds, deserters)
+        .filter((r) => !deserterIds.has(r.userId))
+        .map((r) => ({
+          userId: r.userId,
+          nome: shortLabel(r.displayName),
+          jejum: r.roundsSinceLastWin,
+        })),
+    [members, rounds, deserters, deserterIds],
   );
 
   const top10DroughtHistoryData = useMemo(
@@ -399,6 +403,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
         <p className="mb-2 text-xs text-zinc-500">
           Conta só rodadas <strong>já registradas</strong>, da mais recente (maior número de rodada) para trás,
           até a última em que o jogador foi campeão. Quem nunca venceu acumula todas as rodadas registradas.
+          Quem desistiu da liga não entra.
         </p>
         {rounds.length === 0 ? (
           <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">

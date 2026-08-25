@@ -420,9 +420,10 @@ export function droughtHistoryEntryRankTrend(
   members: LeagueMember[],
   rounds: Round[],
   limit: number,
+  deserters: Deserter[] = [],
 ): DroughtHistoryRankTrend {
   const roundsPrev = roundsExcludingHighestRoundNumber(rounds);
-  const prevTop = topDroughtHistoryEvents(members, roundsPrev, limit).filter((e) => e.length > 1);
+  const prevTop = topDroughtHistoryEvents(members, roundsPrev, limit, deserters).filter((e) => e.length > 1);
   const prevRank = findDroughtHistoryEntryPreviousRank(curr, prevTop, roundsPrev);
   if (prevRank === null) return "none";
   if (currRank1Based < prevRank) return "up";

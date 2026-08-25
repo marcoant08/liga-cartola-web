@@ -63,22 +63,28 @@ export default function LeagueStatsPage() {
     return ranking.filter((r) => r.wins === maxWins);
   }, [ranking]);
 
-  const winDroughtRows = useMemo(() => {
-    if (!league) return [];
-    return computeRoundsSinceLastWin(league.members ?? [], league.rounds ?? []);
-  }, [league]);
-
   const members = league?.members ?? [];
   const rounds = league?.rounds ?? [];
   const deserters = league?.deserters ?? [];
+  const deserterIds = useMemo(
+    () => new Set(deserters.map((d) => d.memberId)),
+    [deserters],
+  );
+
+  const winDroughtRows = useMemo(() => {
+    if (!league) return [];
+    return computeRoundsSinceLastWin(members, rounds, deserters);
+  }, [league, members, rounds, deserters]);
+
   const roundValue = Number(league?.roundValue ?? 0);
   const leader = ranking[0];
   const totalRounds = rounds.length;
   const worstDroughtTied = useMemo(() => {
-    if (winDroughtRows.length === 0) return [];
-    const max = winDroughtRows[0].roundsSinceLastWin;
-    return winDroughtRows.filter((r) => r.roundsSinceLastWin === max);
-  }, [winDroughtRows]);
+    const active = winDroughtRows.filter((r) => !deserterIds.has(r.userId));
+    if (active.length === 0) return [];
+    const max = active[0].roundsSinceLastWin;
+    return active.filter((r) => r.roundsSinceLastWin === max);
+  }, [winDroughtRows, deserterIds]);
 
   if (isLoading) {
     return <p className="text-zinc-500">Carregando estatísticas…</p>;
@@ -189,7 +195,7 @@ export default function LeagueStatsPage() {
               </p>
               <p className="mt-2 text-xs text-amber-900/75 dark:text-amber-200/80">
                 Rodadas já registradas, da mais recente até a última vitória{" "}
-                {worstDroughtTied.length > 1 ? "destes jogadores" : "deste jogador"}.
+                {worstDroughtTied.length > 1 ? "destes jogadores" : "deste jogador"}. Quem desistiu da liga não entra.
               </p>
             </>
           ) : (

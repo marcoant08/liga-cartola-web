@@ -354,7 +354,7 @@ export function LeagueStatsTextBlocks({
                 e.fromRound === e.toRound
                   ? `rodada ${e.fromRound}`
                   : `rodadas ${e.fromRound}–${e.toRound}`;
-              const trend = droughtHistoryEntryRankTrend(e, i + 1, members, rounds, 20);
+              const trend = droughtHistoryEntryRankTrend(e, i + 1, members, rounds, 20, deserters);
               return (
                 <LineRow
                   key={`${e.userId}-${e.fromRound}-${e.toRound}-${i}`}
