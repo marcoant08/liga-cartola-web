@@ -50,6 +50,13 @@ export type League = {
   updatedAt: string;
 };
 
+export type PresenceStats = {
+  uniqueVisitors: number;
+  onlineNow: number;
+  onlineWindowSeconds: number;
+  uniqueVisitorsWindowDays: number;
+};
+
 export type ApiErrorBody = {
   statusCode: number;
   message: string | string[];

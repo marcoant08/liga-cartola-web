@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LeagueStatsCharts } from "@/components/league-stats-charts";
 import { LeagueStatsTextBlocks } from "@/components/league-stats-text-blocks";
+import { SitePresenceStats } from "@/components/site-presence-stats";
 import { useAuth } from "@/contexts/auth-context";
 import { leaguesApi } from "@/lib/api/leagues";
 import { leagueAccessErrorMessage } from "@/lib/league-access-error";
@@ -196,6 +197,8 @@ export default function LeagueStatsPage() {
           )}
         </div>
       </div>
+
+      <SitePresenceStats />
 
       <LeagueStatsTextBlocks
         roundValue={roundValue}
