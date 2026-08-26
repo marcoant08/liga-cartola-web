@@ -169,23 +169,38 @@ function RankedLineTooltip({
     dataKey?: unknown;
   }>;
   label?: unknown;
-  formatValue: (value: unknown) => string;
+  formatValue: (value: unknown, item?: { dataKey?: unknown }) => string;
   uniqueByName?: boolean;
 }) {
   if (!active || !payload?.length) return null;
   const k = typeof label === "number" ? label : Number(label);
+  const isDashKey = (key: string) => key.includes("::d");
+  const isSegKey = (key: string) => key.includes("::s");
   let items = payload
-    .filter((p) => {
-      const key = String(p.dataKey ?? "");
-      return p.value != null && !key.includes("__dot") && !key.includes("::d");
-    })
-    .slice()
-    .sort((a, b) => {
-      const va = Number(a.value);
-      const vb = Number(b.value);
-      if (vb !== va) return vb - va;
-      return String(a.name ?? "").localeCompare(String(b.name ?? ""), "pt-BR");
-    });
+    .filter((p) => p.value != null && !String(p.dataKey ?? "").includes("__dot"))
+    .slice();
+  const solids = items.filter((p) => isSegKey(String(p.dataKey ?? "")));
+  items = items.filter((p) => {
+    const key = String(p.dataKey ?? "");
+    if (isDashKey(key)) {
+      return !solids.some(
+        (s) => s.name === p.name && Number(s.value) === Number(p.value),
+      );
+    }
+    if (isSegKey(key) && Number(p.value) === 0) {
+      return !items.some((o) => o.name === p.name && isDashKey(String(o.dataKey ?? "")));
+    }
+    return true;
+  });
+  items.sort((a, b) => {
+    const va = Number(a.value);
+    const vb = Number(b.value);
+    if (vb !== va) return vb - va;
+    const aEnded = isDashKey(String(a.dataKey ?? ""));
+    const bEnded = isDashKey(String(b.dataKey ?? ""));
+    if (aEnded !== bEnded) return aEnded ? 1 : -1;
+    return String(a.name ?? "").localeCompare(String(b.name ?? ""), "pt-BR");
+  });
   if (uniqueByName) {
     const seen = new Set<string>();
     items = items.filter((p) => {
@@ -205,7 +220,7 @@ function RankedLineTooltip({
       </p>
       {items.map((p) => (
         <p key={String(p.dataKey ?? p.name)} style={{ ...tooltipItemStyle, color: p.color }}>
-          {p.name}: {formatValue(p.value)}
+          {p.name}: {formatValue(p.value, p)}
         </p>
       ))}
     </div>
@@ -607,10 +622,13 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                       active={active}
                       payload={payload}
                       label={label}
-                      uniqueByName
-                      formatValue={(v) =>
-                        `${v} rodada${v === 1 ? "" : "s"} sem vencer`
-                      }
+                      formatValue={(v, item) => {
+                        const n = Number(v);
+                        const base = `${v} rodada${n === 1 ? "" : "s"} sem vencer`;
+                        return String(item?.dataKey ?? "").includes("::d")
+                          ? `${base} (encerrada)`
+                          : base;
+                      }}
                     />
                   )}
                 />
