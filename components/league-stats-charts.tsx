@@ -114,6 +114,21 @@ const tooltipWrapperStyle = {
   outline: "none",
 } as const;
 
+const Y_AXIS_WIDTH = 28;
+const Y_AXIS_MONEY_WIDTH = 42;
+const LINE_CHART_LEFT = 4;
+
+function LineChartYAxisName({ children }: { children: string }) {
+  return (
+    <span
+      className="pointer-events-none absolute top-[45%] left-0.5 z-10 select-none text-[11px] leading-none text-zinc-500 dark:text-zinc-400"
+      style={{ writingMode: "vertical-rl", transform: "translateY(-50%) rotate(180deg)" }}
+    >
+      {children}
+    </span>
+  );
+}
+
 function chartColumnCursor(dark: boolean) {
   return dark
     ? { fill: "rgba(63, 63, 70, 0.42)" }
@@ -542,9 +557,10 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
             Sem rodadas registradas ainda.
           </p>
         ) : (
-          <div className="h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <LineChartYAxisName>Vitórias</LineChartYAxisName>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={winsOverRoundsData} margin={{ top: 8, right: 16, left: 8, bottom: 28 }}>
+              <LineChart data={winsOverRoundsData} margin={{ top: 8, right: 12, left: LINE_CHART_LEFT, bottom: 28 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
                   dataKey="rodadas"
@@ -552,11 +568,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                   tick={{ fontSize: 11 }}
                   label={{ value: "Rodadas registradas", position: "insideBottom", offset: -2, fontSize: 11 }}
                 />
-                <YAxis
-                  allowDecimals={false}
-                  tick={{ fontSize: 11 }}
-                  label={{ value: "Vitórias", angle: -90, position: "insideLeft", fontSize: 11 }}
-                />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={2} />
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
                   content={({ active, payload, label }) => (
@@ -622,9 +634,10 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
             Sem rodadas registradas ainda.
           </p>
         ) : (
-          <div className="h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <LineChartYAxisName>Jejum</LineChartYAxisName>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={droughtStreakChart.points} margin={{ top: 8, right: 16, left: 8, bottom: 28 }}>
+              <LineChart data={droughtStreakChart.points} margin={{ top: 8, right: 12, left: LINE_CHART_LEFT, bottom: 28 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
                   dataKey="rodadas"
@@ -632,11 +645,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                   tick={{ fontSize: 11 }}
                   label={{ value: "Rodadas registradas", position: "insideBottom", offset: -2, fontSize: 11 }}
                 />
-                <YAxis
-                  allowDecimals={false}
-                  tick={{ fontSize: 11 }}
-                  label={{ value: "Jejum", angle: -90, position: "insideLeft", fontSize: 11 }}
-                />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={2} />
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
                   content={({ active, payload, label }) => (
@@ -737,7 +746,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
               <BarChart data={droughtBarData} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={4} />
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
                   contentStyle={tooltipContentStyle}
@@ -776,7 +785,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
               <BarChart data={top10DroughtHistoryData} margin={{ top: 8, right: 8, left: 0, bottom: 64 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="categoria" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={4} />
                 <Tooltip
                   content={SequenceHistoryTooltip}
                   wrapperStyle={tooltipWrapperStyle}
@@ -811,7 +820,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
               <BarChart data={top10WinStreakHistoryData} margin={{ top: 8, right: 8, left: 0, bottom: 64 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="categoria" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={4} />
                 <Tooltip
                   content={SequenceHistoryTooltip}
                   wrapperStyle={tooltipWrapperStyle}
@@ -842,7 +851,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
             <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
               <XAxis dataKey="nome" angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={4} />
               <Tooltip
                 wrapperStyle={tooltipWrapperStyle}
                 contentStyle={tooltipContentStyle}
@@ -878,7 +887,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
               <BarChart data={top5Ganhos} margin={{ top: 8, right: 8, left: 4, bottom: 52 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} width={Y_AXIS_MONEY_WIDTH} tickMargin={4} />
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
                   cursor={chartColumnCursor(isDarkMode)}
@@ -907,7 +916,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
               <BarChart data={top5Perdas} margin={{ top: 8, right: 8, left: 4, bottom: 52 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} width={Y_AXIS_MONEY_WIDTH} tickMargin={4} />
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
                   cursor={chartColumnCursor(isDarkMode)}
@@ -934,7 +943,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
               <BarChart data={top5Lucros} margin={{ top: 8, right: 8, left: 4, bottom: 52 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${v}`} width={Y_AXIS_MONEY_WIDTH} tickMargin={4} />
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
                   cursor={chartColumnCursor(isDarkMode)}
