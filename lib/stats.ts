@@ -329,6 +329,7 @@ export function computeLucroOverRegisteredRounds(
 }
 
 const OVERLAP_DASH_PX = 7;
+const OVERLAP_HOLE_PX = 5;
 
 export type LineSeriesRef = {
   userId: string;
@@ -349,6 +350,7 @@ export type OverlapPatternSeries = {
   dasharray: string;
   dashOffset: number;
   showLegend: boolean;
+  keepDashed: boolean;
 };
 
 export type OverlappingLinesPattern = {
@@ -493,7 +495,8 @@ export function patternOverlappingLines(
   for (let ri = 0; ri < runs.length; ri++) {
     const run = runs[ri];
     const n = run.members.length;
-    const gap = OVERLAP_DASH_PX * (n - 1);
+    const keepDashed = run.members.every((m) => m.dataKey.includes("::d"));
+    const gap = OVERLAP_DASH_PX * (n - 1) + (keepDashed ? OVERLAP_HOLE_PX : 0);
     for (let i = 0; i < n; i++) {
       const m = run.members[i];
       const dataKey = `__ov::${ri}::${m.dataKey}`;
@@ -505,6 +508,7 @@ export function patternOverlappingLines(
         dasharray: `${OVERLAP_DASH_PX} ${gap}`,
         dashOffset: OVERLAP_DASH_PX * i,
         showLegend,
+        keepDashed,
       });
       for (let t = run.fromK; t <= run.toK; t++) {
         out[t][dataKey] = numericPlotValue(points[t][m.dataKey]);
