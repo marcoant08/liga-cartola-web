@@ -569,18 +569,40 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                   )}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                {lineSeries.map((s) => (
-                  <Line
-                    key={s.userId}
-                    type="monotone"
-                    dataKey={s.userId}
-                    name={s.name}
-                    stroke={barColorForUserId(s.userId, isDarkMode)}
-                    strokeWidth={3}
-                    dot={false}
-                    connectNulls={false}
-                  />
-                ))}
+                {lineSeries.map((s) => {
+                  const color = barColorForUserId(s.userId, isDarkMode);
+                  return (
+                    <Line
+                      key={s.userId}
+                      type="monotone"
+                      dataKey={s.userId}
+                      name={s.name}
+                      stroke={color}
+                      strokeWidth={3}
+                      connectNulls={false}
+                      activeDot={false}
+                      dot={(props) => {
+                        const k =
+                          typeof props.index === "number"
+                            ? props.index
+                            : Number((props.payload as { rodadas?: number } | undefined)?.rodadas);
+                        const value = Number(props.value);
+                        if (!Number.isFinite(k) || k <= 0 || !Number.isFinite(value)) return null;
+                        const prev = winsOverRoundsData[k - 1]?.[s.userId];
+                        if (typeof prev !== "number" || value <= prev) return null;
+                        return (
+                          <DroughtEndDot
+                            cx={props.cx}
+                            cy={props.cy}
+                            value={value}
+                            fill={color}
+                            textColor={isDarkMode ? "#fafafa" : "#18181b"}
+                          />
+                        );
+                      }}
+                    />
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
           </div>
