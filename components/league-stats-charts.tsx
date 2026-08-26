@@ -954,6 +954,27 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                   )}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
+                {winsOverlap.overlaps.map((ov) => {
+                  const color = barColorForUserId(ov.userId, isDarkMode);
+                  const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
+                  return (
+                    <Line
+                      key={ov.dataKey}
+                      type="linear"
+                      dataKey={ov.dataKey}
+                      name={name}
+                      stroke={color}
+                      strokeWidth={ov.keepDashed ? 2 : 3}
+                      strokeDasharray={ov.dasharray}
+                      strokeDashoffset={ov.dashOffset}
+                      strokeLinecap={ov.keepDashed ? "butt" : undefined}
+                      legendType={ov.showLegend ? "line" : "none"}
+                      dot={false}
+                      connectNulls={false}
+                      isAnimationActive={false}
+                    />
+                  );
+                })}
                 {winsOverlap.unique.map((seg) => {
                   const color = barColorForUserId(seg.userId, isDarkMode);
                   const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
@@ -989,27 +1010,6 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                           />
                         );
                       }}
-                    />
-                  );
-                })}
-                {winsOverlap.overlaps.map((ov) => {
-                  const color = barColorForUserId(ov.userId, isDarkMode);
-                  const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
-                  return (
-                    <Line
-                      key={ov.dataKey}
-                      type="linear"
-                      dataKey={ov.dataKey}
-                      name={name}
-                      stroke={color}
-                      strokeWidth={ov.keepDashed ? 2 : 3}
-                      strokeDasharray={ov.dasharray}
-                      strokeDashoffset={ov.dashOffset}
-                      strokeLinecap={ov.keepDashed ? "butt" : undefined}
-                      legendType={ov.showLegend ? "line" : "none"}
-                      dot={false}
-                      connectNulls={false}
-                      isAnimationActive={false}
                     />
                   );
                 })}
@@ -1087,45 +1087,90 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                   )}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                {droughtOverlap.unique.map((seg) => {
-                  const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
-                  const color = barColorForUserId(seg.userId, isDarkMode);
-                  return (
-                    <Line
-                      key={seg.dataKey}
-                      type="linear"
-                      dataKey={seg.dataKey}
-                      name={name}
-                      stroke={color}
-                      strokeWidth={seg.dashed ? 2 : 3}
-                      strokeDasharray={seg.dashed ? "7 5" : undefined}
-                      legendType={seg.isFirst ? "line" : "none"}
-                      dot={false}
-                      connectNulls={false}
-                    />
-                  );
-                })}
-                {droughtOverlap.overlaps.map((ov) => {
-                  const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
-                  const color = barColorForUserId(ov.userId, isDarkMode);
-                  return (
-                    <Line
-                      key={ov.dataKey}
-                      type="linear"
-                      dataKey={ov.dataKey}
-                      name={name}
-                      stroke={color}
-                      strokeWidth={ov.keepDashed ? 2 : 3}
-                      strokeDasharray={ov.dasharray}
-                      strokeDashoffset={ov.dashOffset}
-                      strokeLinecap={ov.keepDashed ? "butt" : undefined}
-                      legendType={ov.showLegend ? "line" : "none"}
-                      dot={false}
-                      connectNulls={false}
-                      isAnimationActive={false}
-                    />
-                  );
-                })}
+                {droughtOverlap.unique
+                  .filter((seg) => seg.dashed)
+                  .map((seg) => {
+                    const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
+                    const color = barColorForUserId(seg.userId, isDarkMode);
+                    return (
+                      <Line
+                        key={seg.dataKey}
+                        type="linear"
+                        dataKey={seg.dataKey}
+                        name={name}
+                        stroke={color}
+                        strokeWidth={2}
+                        strokeDasharray="7 5"
+                        legendType={seg.isFirst ? "line" : "none"}
+                        dot={false}
+                        connectNulls={false}
+                      />
+                    );
+                  })}
+                {droughtOverlap.overlaps
+                  .filter((ov) => ov.keepDashed)
+                  .map((ov) => {
+                    const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
+                    const color = barColorForUserId(ov.userId, isDarkMode);
+                    return (
+                      <Line
+                        key={ov.dataKey}
+                        type="linear"
+                        dataKey={ov.dataKey}
+                        name={name}
+                        stroke={color}
+                        strokeWidth={2}
+                        strokeDasharray={ov.dasharray}
+                        strokeDashoffset={ov.dashOffset}
+                        strokeLinecap="butt"
+                        legendType={ov.showLegend ? "line" : "none"}
+                        dot={false}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                      />
+                    );
+                  })}
+                {droughtOverlap.overlaps
+                  .filter((ov) => !ov.keepDashed)
+                  .map((ov) => {
+                    const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
+                    const color = barColorForUserId(ov.userId, isDarkMode);
+                    return (
+                      <Line
+                        key={ov.dataKey}
+                        type="linear"
+                        dataKey={ov.dataKey}
+                        name={name}
+                        stroke={color}
+                        strokeWidth={3}
+                        strokeDasharray={ov.dasharray}
+                        strokeDashoffset={ov.dashOffset}
+                        legendType={ov.showLegend ? "line" : "none"}
+                        dot={false}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                      />
+                    );
+                  })}
+                {droughtOverlap.unique
+                  .filter((seg) => !seg.dashed)
+                  .map((seg) => {
+                    const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
+                    const color = barColorForUserId(seg.userId, isDarkMode);
+                    return (
+                      <Line
+                        key={seg.dataKey}
+                        type="linear"
+                        dataKey={seg.dataKey}
+                        name={name}
+                        stroke={color}
+                        strokeWidth={3}
+                        legendType={seg.isFirst ? "line" : "none"}
+                        dot={false}
+                        connectNulls={false}
+                      />
+                    );
+                  })}
                 {lineSeries.map((s) => {
                   const color = barColorForUserId(s.userId, isDarkMode);
                   return (
@@ -1222,24 +1267,6 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                   )}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                {lucroOverlap.unique.map((seg) => {
-                  const color = barColorForUserId(seg.userId, isDarkMode);
-                  const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
-                  return (
-                    <Line
-                      key={seg.dataKey}
-                      type="linear"
-                      dataKey={seg.dataKey}
-                      name={name}
-                      stroke={color}
-                      strokeWidth={3}
-                      legendType={seg.isFirst ? "line" : "none"}
-                      connectNulls={false}
-                      dot={false}
-                      activeDot={false}
-                    />
-                  );
-                })}
                 {lucroOverlap.overlaps.map((ov) => {
                   const color = barColorForUserId(ov.userId, isDarkMode);
                   const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
@@ -1258,6 +1285,24 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                       dot={false}
                       connectNulls={false}
                       isAnimationActive={false}
+                    />
+                  );
+                })}
+                {lucroOverlap.unique.map((seg) => {
+                  const color = barColorForUserId(seg.userId, isDarkMode);
+                  const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
+                  return (
+                    <Line
+                      key={seg.dataKey}
+                      type="linear"
+                      dataKey={seg.dataKey}
+                      name={name}
+                      stroke={color}
+                      strokeWidth={3}
+                      legendType={seg.isFirst ? "line" : "none"}
+                      connectNulls={false}
+                      dot={false}
+                      activeDot={false}
                     />
                   );
                 })}
