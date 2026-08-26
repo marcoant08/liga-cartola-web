@@ -225,6 +225,53 @@ export function computeSeasonPlayerLines(
   return lines;
 }
 
+/** Ponto do gráfico de vitórias acumuladas: `rodadas` é o k (0…N); cada `userId` é o total ou `null` após desistência. */
+export type WinsOverRegisteredRoundPoint = {
+  rodadas: number;
+} & Record<string, number | null>;
+
+/**
+ * Vitórias acumuladas após k rodadas já registradas (timeline canônica).
+ * k = 0 começa em 0 para todos. Desertores ficam `null` a partir da rodada em que desistiram.
+ */
+export function computeWinsOverRegisteredRounds(
+  members: LeagueMember[],
+  rounds: Round[],
+  deserters: Deserter[] = [],
+): WinsOverRegisteredRoundPoint[] {
+  if (members.length === 0) return [];
+
+  const deserterMap = new Map(deserters.map((d) => [d.memberId, d.desertedAtRound]));
+  const timeline = canonicalRoundsTimeline(rounds);
+  const wins = new Map<string, number>(members.map((m) => [m.userId, 0]));
+
+  const snapshot = (k: number, roundNumber: number | null): WinsOverRegisteredRoundPoint => {
+    const row: WinsOverRegisteredRoundPoint = { rodadas: k };
+    for (const m of members) {
+      const cutoff = memberRoundCutoff(m.userId, deserterMap);
+      if (roundNumber != null && roundNumber >= cutoff) {
+        row[m.userId] = null;
+      } else {
+        row[m.userId] = wins.get(m.userId) ?? 0;
+      }
+    }
+    return row;
+  };
+
+  const points: WinsOverRegisteredRoundPoint[] = [snapshot(0, null)];
+
+  for (let i = 0; i < timeline.length; i++) {
+    const r = timeline[i];
+    const cutoffWinner = memberRoundCutoff(r.winnerId, deserterMap);
+    if (r.roundNumber < cutoffWinner) {
+      wins.set(r.winnerId, (wins.get(r.winnerId) ?? 0) + 1);
+    }
+    points.push(snapshot(i + 1, r.roundNumber));
+  }
+
+  return points;
+}
+
 export function buildWinnerByRound(rounds: Round[]): Map<number, string> {
   const map = new Map<number, string>();
   for (const r of canonicalRoundsTimeline(rounds)) {
@@ -361,6 +408,24 @@ export function topDroughtHistoryEvents(
     return a.displayName.localeCompare(b.displayName, "pt-BR");
   });
   return events.slice(0, limit);
+}
+
+/** Todos os jejuns com o maior comprimento da liga (empates incluídos). */
+export function longestDroughtHistoryEvents(
+  members: LeagueMember[],
+  rounds: Round[],
+  deserters: Deserter[] = [],
+): DroughtHistoryEntry[] {
+  const events = computeDroughtHistoryEvents(members, rounds, deserters);
+  if (events.length === 0) return [];
+  events.sort((a, b) => {
+    if (b.length !== a.length) return b.length - a.length;
+    if (b.toRound !== a.toRound) return b.toRound - a.toRound;
+    if (a.fromRound !== b.fromRound) return a.fromRound - b.fromRound;
+    return a.displayName.localeCompare(b.displayName, "pt-BR");
+  });
+  const max = events[0].length;
+  return events.filter((e) => e.length === max);
 }
 
 /** Remove a rodada de maior `roundNumber` (a última na timeline canônica), para comparar ranking com o snapshot anterior. */

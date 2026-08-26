@@ -13,9 +13,9 @@ import { leagueAccessErrorMessage } from "@/lib/league-access-error";
 import {
   aggregateWinnerStats,
   buildWinnerByRound,
-  computeRoundsSinceLastWin,
   computeSeasonPlayerLines,
   getLastRegisteredRound,
+  longestDroughtHistoryEvents,
 } from "@/lib/stats";
 
 export default function LeagueStatsPage() {
@@ -66,25 +66,15 @@ export default function LeagueStatsPage() {
   const members = league?.members ?? [];
   const rounds = league?.rounds ?? [];
   const deserters = league?.deserters ?? [];
-  const deserterIds = useMemo(
-    () => new Set(deserters.map((d) => d.memberId)),
-    [deserters],
-  );
 
-  const winDroughtRows = useMemo(() => {
+  const longestDroughts = useMemo(() => {
     if (!league) return [];
-    return computeRoundsSinceLastWin(members, rounds, deserters);
+    return longestDroughtHistoryEvents(members, rounds, deserters);
   }, [league, members, rounds, deserters]);
 
   const roundValue = Number(league?.roundValue ?? 0);
   const leader = ranking[0];
   const totalRounds = rounds.length;
-  const worstDroughtTied = useMemo(() => {
-    const active = winDroughtRows.filter((r) => !deserterIds.has(r.userId));
-    if (active.length === 0) return [];
-    const max = active[0].roundsSinceLastWin;
-    return active.filter((r) => r.roundsSinceLastWin === max);
-  }, [winDroughtRows, deserterIds]);
 
   if (isLoading) {
     return <p className="text-zinc-500">Carregando estatísticas…</p>;
@@ -176,26 +166,34 @@ export default function LeagueStatsPage() {
         </div>
         <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 p-4 dark:border-amber-900/50 dark:bg-amber-950/25">
           <p className="text-xs font-medium uppercase tracking-wide text-amber-900/80 dark:text-amber-200/90">
-            Maior jejum sem vitória
+            Maior jejum da história
           </p>
           {totalRounds === 0 ? (
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Ainda não há rodadas registradas.</p>
           ) : members.length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Sem participantes na liga.</p>
-          ) : worstDroughtTied.length > 0 ? (
+          ) : longestDroughts.length > 0 ? (
             <>
               <p className="mt-1 text-2xl font-semibold text-amber-950 dark:text-amber-50">
-                {worstDroughtTied[0].roundsSinceLastWin}{" "}
+                {longestDroughts[0].length}{" "}
                 <span className="text-lg font-medium text-amber-900/90 dark:text-amber-100/90">
-                  rodada{worstDroughtTied[0].roundsSinceLastWin === 1 ? "" : "s"}
+                  rodada{longestDroughts[0].length === 1 ? "" : "s"}
                 </span>
               </p>
               <p className="mt-1 text-sm font-medium leading-snug text-amber-950 dark:text-amber-100">
-                {worstDroughtTied.map((p) => p.displayName).join(" · ")}
+                {longestDroughts
+                  .map((e) => {
+                    const span =
+                      e.fromRound === e.toRound
+                        ? `rodada ${e.fromRound}`
+                        : `rodadas ${e.fromRound}–${e.toRound}`;
+                    return `${e.displayName} (${span})`;
+                  })
+                  .join(" · ")}
               </p>
               <p className="mt-2 text-xs text-amber-900/75 dark:text-amber-200/80">
-                Rodadas já registradas, da mais recente até a última vitória{" "}
-                {worstDroughtTied.length > 1 ? "destes jogadores" : "deste jogador"}. Quem desistiu da liga não entra.
+                Maior sequência consecutiva sem vitória desde o início da liga. Ao vencer, a contagem zera.
+                {deserters.length > 0 ? " Quem desistiu só conta até a rodada anterior à desistência." : ""}
               </p>
             </>
           ) : (

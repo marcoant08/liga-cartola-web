@@ -8,6 +8,8 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ReferenceLine,
@@ -22,6 +24,7 @@ import type { Deserter, LeagueMember, Round } from "@/lib/types/api";
 import {
   aggregateWinnerStats,
   computeRoundsSinceLastWin,
+  computeWinsOverRegisteredRounds,
   topDroughtHistoryEvents,
   topWinStreakHistoryEvents,
   type SeasonPlayerLine,
@@ -145,6 +148,48 @@ function SequenceHistoryTooltip({
         {row.rodadas} rodada{row.rodadas === 1 ? "" : "s"}
       </p>
       <p style={{ ...tooltipItemStyle, fontSize: 12, opacity: 0.75, marginTop: 4 }}>{row.periodo}</p>
+    </div>
+  );
+}
+
+function WinsOverRoundsTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: ReadonlyArray<{
+    name?: string | number;
+    value?: unknown;
+    color?: string;
+    dataKey?: unknown;
+  }>;
+  label?: unknown;
+}) {
+  if (!active || !payload?.length) return null;
+  const k = typeof label === "number" ? label : Number(label);
+  const items = payload
+    .filter((p) => p.value != null)
+    .slice()
+    .sort((a, b) => {
+      const va = Number(a.value);
+      const vb = Number(b.value);
+      if (vb !== va) return vb - va;
+      return String(a.name ?? "").localeCompare(String(b.name ?? ""), "pt-BR");
+    });
+  if (items.length === 0) return null;
+  return (
+    <div className="max-h-72 overflow-y-auto rounded-lg px-3 py-2 text-sm" style={tooltipContentStyle}>
+      <p style={tooltipLabelStyle}>
+        {k === 0
+          ? "Nenhuma rodada registrada"
+          : `Após ${k} rodada${k === 1 ? "" : "s"} registrada${k === 1 ? "" : "s"}`}
+      </p>
+      {items.map((p) => (
+        <p key={String(p.dataKey ?? p.name)} style={{ ...tooltipItemStyle, color: p.color }}>
+          {p.name}: {String(p.value)} vitória{p.value === 1 ? "" : "s"}
+        </p>
+      ))}
     </div>
   );
 }
@@ -355,6 +400,20 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
     });
   }, [members]);
 
+  const winsOverRoundsData = useMemo(
+    () => computeWinsOverRegisteredRounds(members, rounds, deserters),
+    [members, rounds, deserters],
+  );
+
+  const lineSeries = useMemo(
+    () =>
+      members.map((m) => ({
+        userId: m.userId,
+        name: (m.teamName?.trim() || m.userName || m.userId).trim(),
+      })),
+    [members],
+  );
+
   if (members.length === 0) {
     return (
       <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -396,6 +455,57 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
             );
           })}
         </div>
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Vitórias ao longo das rodadas</h2>
+        <p className="mb-2 text-xs text-zinc-500">
+          Cada linha é um time: o eixo X é o número de rodadas já registradas e o eixo Y é o total de
+          vitórias até aquele ponto. Quem desistiu para de aparecer a partir da rodada da desistência.
+        </p>
+        {rounds.length === 0 ? (
+          <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
+            Sem rodadas registradas ainda.
+          </p>
+        ) : (
+          <div className="h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={winsOverRoundsData} margin={{ top: 8, right: 16, left: 8, bottom: 28 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
+                <XAxis
+                  dataKey="rodadas"
+                  allowDecimals={false}
+                  tick={{ fontSize: 11 }}
+                  label={{ value: "Rodadas registradas", position: "insideBottom", offset: -2, fontSize: 11 }}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fontSize: 11 }}
+                  label={{ value: "Vitórias", angle: -90, position: "insideLeft", fontSize: 11 }}
+                />
+                <Tooltip
+                  wrapperStyle={tooltipWrapperStyle}
+                  content={({ active, payload, label }) => (
+                    <WinsOverRoundsTooltip active={active} payload={payload} label={label} />
+                  )}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {lineSeries.map((s) => (
+                  <Line
+                    key={s.userId}
+                    type="monotone"
+                    dataKey={s.userId}
+                    name={s.name}
+                    stroke={barColorForUserId(s.userId, isDarkMode)}
+                    strokeWidth={3}
+                    dot={false}
+                    connectNulls={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </section>
 
       <section>
