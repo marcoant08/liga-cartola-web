@@ -328,6 +328,200 @@ export function computeLucroOverRegisteredRounds(
   return points;
 }
 
+const OVERLAP_DASH_PX = 7;
+
+export type LineSeriesRef = {
+  userId: string;
+  dataKey: string;
+};
+
+export type UniqueLineSegment = {
+  userId: string;
+  sourceKey: string;
+  dataKey: string;
+  isFirst: boolean;
+  dashed: boolean;
+};
+
+export type OverlapPatternSeries = {
+  userId: string;
+  dataKey: string;
+  dasharray: string;
+  dashOffset: number;
+  showLegend: boolean;
+};
+
+export type OverlappingLinesPattern = {
+  points: WinsOverRegisteredRoundPoint[];
+  unique: UniqueLineSegment[];
+  overlaps: OverlapPatternSeries[];
+};
+
+function samePlotValue(a: unknown, b: unknown): boolean {
+  if (typeof a !== "number" || typeof b !== "number") return false;
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  return Math.abs(a - b) < 1e-9;
+}
+
+function numericPlotValue(v: unknown): number | null {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  return v;
+}
+
+function overlapGroupKey(members: LineSeriesRef[]): string {
+  return members
+    .map((m) => m.dataKey)
+    .sort()
+    .join("|");
+}
+
+/**
+ * Em cada segmento k → k+1, quem tem o mesmo Y nos dois extremos (horizontal ou andando junto).
+ * O conjunto pode mudar de um segmento para o outro: A e B continuam sobrepostos mesmo se C entrar/sair.
+ */
+export function findOverlappingLineRuns(
+  points: WinsOverRegisteredRoundPoint[],
+  series: LineSeriesRef[],
+): { fromK: number; toK: number; members: LineSeriesRef[] }[] {
+  if (points.length < 2 || series.length < 2) return [];
+
+  const edges: { k: number; members: LineSeriesRef[] }[] = [];
+  for (let k = 0; k < points.length - 1; k++) {
+    const groups: { y0: number; y1: number; members: LineSeriesRef[] }[] = [];
+    for (const s of series) {
+      const y0 = numericPlotValue(points[k][s.dataKey]);
+      const y1 = numericPlotValue(points[k + 1][s.dataKey]);
+      if (y0 == null || y1 == null) continue;
+      let g = groups.find((x) => samePlotValue(x.y0, y0) && samePlotValue(x.y1, y1));
+      if (!g) {
+        g = { y0, y1, members: [] };
+        groups.push(g);
+      }
+      g.members.push(s);
+    }
+    for (const g of groups) {
+      if (g.members.length < 2) continue;
+      edges.push({
+        k,
+        members: g.members.map((m) => ({ userId: m.userId, dataKey: m.dataKey })),
+      });
+    }
+  }
+
+  edges.sort((a, b) => a.k - b.k || overlapGroupKey(a.members).localeCompare(overlapGroupKey(b.members)));
+
+  const runs: { fromK: number; toK: number; members: LineSeriesRef[] }[] = [];
+  for (const edge of edges) {
+    const gk = overlapGroupKey(edge.members);
+    const prev = runs.find((r) => r.toK === edge.k && overlapGroupKey(r.members) === gk);
+    if (prev) prev.toK = edge.k + 1;
+    else runs.push({ fromK: edge.k, toK: edge.k + 1, members: edge.members });
+  }
+  return runs;
+}
+
+/**
+ * Separa linhas sólidas dos trechos sobrepostos: o overlap vira tracejado intercalado
+ * com uma cor por participante (efeito de “espiral”/candy cane).
+ */
+export function patternOverlappingLines(
+  points: WinsOverRegisteredRoundPoint[],
+  series: LineSeriesRef[],
+): OverlappingLinesPattern {
+  const nPts = points.length;
+  const out: WinsOverRegisteredRoundPoint[] = Array.from({ length: nPts }, (_, k) => ({
+    rodadas: points[k]?.rodadas ?? k,
+  }));
+  const unique: UniqueLineSegment[] = [];
+  const overlaps: OverlapPatternSeries[] = [];
+  if (nPts === 0 || series.length === 0) {
+    return { points: out, unique, overlaps };
+  }
+
+  const runs = findOverlappingLineRuns(points, series);
+  const overlapEdge = new Set<string>();
+  for (const run of runs) {
+    for (let k = run.fromK; k < run.toK; k++) {
+      for (const m of run.members) overlapEdge.add(`${m.dataKey}:${k}`);
+    }
+  }
+
+  const legendSeen = new Set<string>();
+  for (const s of series) {
+    const dashed = s.dataKey.includes("::d");
+    let segIdx = 0;
+    let k = 0;
+    while (k < nPts - 1) {
+      const cur = points[k][s.dataKey];
+      const nxt = points[k + 1][s.dataKey];
+      const uniqueEdge =
+        typeof cur === "number" &&
+        Number.isFinite(cur) &&
+        typeof nxt === "number" &&
+        Number.isFinite(nxt) &&
+        !overlapEdge.has(`${s.dataKey}:${k}`);
+      if (!uniqueEdge) {
+        k++;
+        continue;
+      }
+      const start = k;
+      while (k < nPts - 1) {
+        const a = points[k][s.dataKey];
+        const b = points[k + 1][s.dataKey];
+        if (
+          typeof a !== "number" ||
+          typeof b !== "number" ||
+          !Number.isFinite(a) ||
+          !Number.isFinite(b) ||
+          overlapEdge.has(`${s.dataKey}:${k}`)
+        ) {
+          break;
+        }
+        k++;
+      }
+      const dataKey = `${s.dataKey}::u${segIdx++}`;
+      const isFirst = !legendSeen.has(s.userId);
+      if (isFirst) legendSeen.add(s.userId);
+      unique.push({ userId: s.userId, sourceKey: s.dataKey, dataKey, isFirst, dashed });
+      for (let t = start; t <= k; t++) {
+        const v = points[t][s.dataKey];
+        out[t][dataKey] = typeof v === "number" ? v : null;
+      }
+    }
+  }
+
+  for (let ri = 0; ri < runs.length; ri++) {
+    const run = runs[ri];
+    const n = run.members.length;
+    const gap = OVERLAP_DASH_PX * (n - 1);
+    for (let i = 0; i < n; i++) {
+      const m = run.members[i];
+      const dataKey = `__ov::${ri}::${m.dataKey}`;
+      const showLegend = !legendSeen.has(m.userId);
+      if (showLegend) legendSeen.add(m.userId);
+      overlaps.push({
+        userId: m.userId,
+        dataKey,
+        dasharray: `${OVERLAP_DASH_PX} ${gap}`,
+        dashOffset: OVERLAP_DASH_PX * i,
+        showLegend,
+      });
+      for (let t = run.fromK; t <= run.toK; t++) {
+        out[t][dataKey] = numericPlotValue(points[t][m.dataKey]);
+      }
+    }
+  }
+
+  const extraKeys = [...unique.map((u) => u.dataKey), ...overlaps.map((o) => o.dataKey)];
+  for (const row of out) {
+    for (const key of extraKeys) {
+      if (row[key] === undefined) row[key] = null;
+    }
+  }
+
+  return { points: out, unique, overlaps };
+}
+
 /**
  * Jejum consecutivo após k rodadas registradas.
  * Cada sequência é uma série à parte: ao vencer, a linha anterior termina (com marcador no pico)

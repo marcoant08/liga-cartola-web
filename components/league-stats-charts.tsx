@@ -29,6 +29,7 @@ import {
   computeWinsOverRegisteredRounds,
   droughtStreakDotKey,
   formatBRL,
+  patternOverlappingLines,
   topDroughtHistoryEvents,
   topWinStreakHistoryEvents,
   type SeasonPlayerLine,
@@ -207,6 +208,7 @@ function RankedLineTooltip({
   label,
   formatValue,
   uniqueByName = false,
+  maxItems = TOOLTIP_TOP_N,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{
@@ -218,6 +220,7 @@ function RankedLineTooltip({
   label?: unknown;
   formatValue: (value: unknown, item?: { dataKey?: unknown }) => string;
   uniqueByName?: boolean;
+  maxItems?: number;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -234,7 +237,13 @@ function RankedLineTooltip({
   let items = payload
     .filter((p) => {
       const key = String(p.dataKey ?? "");
-      return p.value != null && !key.includes("__dot") && !key.includes("__endPie") && !key.includes("__lucroPie");
+      return (
+        p.value != null &&
+        !key.includes("__dot") &&
+        !key.includes("__endPie") &&
+        !key.includes("__lucroPie") &&
+        !key.includes("__winsPie")
+      );
     })
     .slice();
   const solids = items.filter((p) => isSegKey(String(p.dataKey ?? "")));
@@ -267,10 +276,19 @@ function RankedLineTooltip({
       seen.add(n);
       return true;
     });
+  } else {
+    const seen = new Set<string>();
+    items = items.filter((p) => {
+      const id = `${p.name}:${Number(p.value)}:${p.color ?? ""}`;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
   }
   if (items.length === 0) return null;
-  const hidden = Math.max(0, items.length - TOOLTIP_TOP_N);
-  const visible = items.slice(0, TOOLTIP_TOP_N);
+  const cap = Number.isFinite(maxItems) && maxItems > 0 ? maxItems : items.length;
+  const hidden = Math.max(0, items.length - cap);
+  const visible = items.slice(0, cap);
   return (
     <div
       ref={boxRef}
@@ -444,6 +462,45 @@ function droughtEndPieKey(y: number): string {
 
 function lucroEndPieKey(idx: number, y: number): string {
   return `__lucroPie::${idx}::${y}`;
+}
+
+function winsEndPieKey(idx: number, y: number): string {
+  return `__winsPie::${idx}::${y}`;
+}
+
+function groupLineEndPies(
+  points: ReadonlyArray<{ rodadas: number } & Record<string, number | null>>,
+  series: { userId: string; name: string }[],
+  pieKey: (idx: number, y: number) => string,
+): { idx: number; y: number; dataKey: string; userIds: string[] }[] {
+  if (points.length === 0) return [];
+  const nameOf = (id: string) => series.find((s) => s.userId === id)?.name ?? id;
+  const groups = new Map<string, { idx: number; y: number; ids: Set<string> }>();
+  for (const s of series) {
+    let lastIdx = -1;
+    let lastY: number | null = null;
+    for (let i = 0; i < points.length; i++) {
+      const v = points[i][s.userId];
+      if (typeof v === "number" && Number.isFinite(v)) {
+        lastIdx = i;
+        lastY = v;
+      }
+    }
+    if (lastIdx < 0 || lastY == null) continue;
+    const key = `${lastIdx}::${lastY}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = { idx: lastIdx, y: lastY, ids: new Set() };
+      groups.set(key, g);
+    }
+    g.ids.add(s.userId);
+  }
+  return [...groups.values()].map((g) => ({
+    idx: g.idx,
+    y: g.y,
+    dataKey: pieKey(g.idx, g.y),
+    userIds: [...g.ids].sort((a, b) => nameOf(a).localeCompare(nameOf(b), "pt-BR")),
+  }));
 }
 
 function formatMoneyTooltip(v: number): string {
@@ -688,6 +745,37 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
     [members],
   );
 
+  const memberLineRefs = useMemo(
+    () => lineSeries.map((s) => ({ userId: s.userId, dataKey: s.userId })),
+    [lineSeries],
+  );
+
+  const winsOverlap = useMemo(
+    () => patternOverlappingLines(winsOverRoundsData, memberLineRefs),
+    [winsOverRoundsData, memberLineRefs],
+  );
+
+  const winsEndPies = useMemo(
+    () => groupLineEndPies(winsOverRoundsData, lineSeries, winsEndPieKey),
+    [winsOverRoundsData, lineSeries],
+  );
+
+  const winsChartPoints = useMemo(() => {
+    if (winsOverRoundsData.length === 0) return winsOverRoundsData;
+    return winsOverRoundsData.map((row, i) => {
+      const extra: typeof row = { ...row, ...winsOverlap.points[i] };
+      for (const pie of winsEndPies) {
+        if (pie.idx === i) extra[pie.dataKey] = pie.y;
+      }
+      return extra;
+    });
+  }, [winsOverRoundsData, winsOverlap.points, winsEndPies]);
+
+  const lucroOverlap = useMemo(
+    () => patternOverlappingLines(lucroOverRoundsData, memberLineRefs),
+    [lucroOverRoundsData, memberLineRefs],
+  );
+
   const droughtEndPies = useMemo(() => {
     const last = droughtStreakChart.points[droughtStreakChart.points.length - 1];
     if (!last) return [];
@@ -712,61 +800,48 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
       }));
   }, [droughtStreakChart, lineSeries]);
 
+  const droughtOverlapSeries = useMemo(
+    () => [
+      ...droughtStreakChart.segments.map((seg) => ({ userId: seg.userId, dataKey: seg.dataKey })),
+      ...droughtStreakChart.dashes.map((dash) => ({ userId: dash.userId, dataKey: dash.dataKey })),
+    ],
+    [droughtStreakChart.segments, droughtStreakChart.dashes],
+  );
+
+  const droughtOverlap = useMemo(
+    () => patternOverlappingLines(droughtStreakChart.points, droughtOverlapSeries),
+    [droughtStreakChart.points, droughtOverlapSeries],
+  );
+
   const droughtStreakPoints = useMemo(() => {
     const pts = droughtStreakChart.points;
-    if (pts.length === 0 || droughtEndPies.length === 0) return pts;
+    if (pts.length === 0) return pts;
     const lastIdx = pts.length - 1;
     return pts.map((row, i) => {
-      if (i !== lastIdx) return row;
-      const extra: typeof row = { ...row };
-      for (const pie of droughtEndPies) extra[pie.dataKey] = pie.y;
+      const extra: typeof row = { ...row, ...droughtOverlap.points[i] };
+      if (i === lastIdx) {
+        for (const pie of droughtEndPies) extra[pie.dataKey] = pie.y;
+      }
       return extra;
     });
-  }, [droughtStreakChart.points, droughtEndPies]);
+  }, [droughtStreakChart.points, droughtOverlap.points, droughtEndPies]);
 
-  const lucroEndPies = useMemo(() => {
-    const pts = lucroOverRoundsData;
-    if (pts.length === 0) return [];
-    const nameOf = (id: string) => lineSeries.find((s) => s.userId === id)?.name ?? id;
-    const groups = new Map<string, { idx: number; y: number; ids: Set<string> }>();
-    for (const s of lineSeries) {
-      let lastIdx = -1;
-      let lastY: number | null = null;
-      for (let i = 0; i < pts.length; i++) {
-        const v = pts[i][s.userId];
-        if (typeof v === "number" && Number.isFinite(v)) {
-          lastIdx = i;
-          lastY = v;
-        }
-      }
-      if (lastIdx < 0 || lastY == null) continue;
-      const key = `${lastIdx}::${lastY}`;
-      let g = groups.get(key);
-      if (!g) {
-        g = { idx: lastIdx, y: lastY, ids: new Set() };
-        groups.set(key, g);
-      }
-      g.ids.add(s.userId);
-    }
-    return [...groups.values()].map((g) => ({
-      idx: g.idx,
-      y: g.y,
-      dataKey: lucroEndPieKey(g.idx, g.y),
-      userIds: [...g.ids].sort((a, b) => nameOf(a).localeCompare(nameOf(b), "pt-BR")),
-    }));
-  }, [lucroOverRoundsData, lineSeries]);
+  const lucroEndPies = useMemo(
+    () => groupLineEndPies(lucroOverRoundsData, lineSeries, lucroEndPieKey),
+    [lucroOverRoundsData, lineSeries],
+  );
 
   const lucroChartPoints = useMemo(() => {
     const pts = lucroOverRoundsData;
-    if (pts.length === 0 || lucroEndPies.length === 0) return pts;
+    if (pts.length === 0) return pts;
     return pts.map((row, i) => {
-      const extraPies = lucroEndPies.filter((pie) => pie.idx === i);
-      if (extraPies.length === 0) return row;
-      const extra: typeof row = { ...row };
-      for (const pie of extraPies) extra[pie.dataKey] = pie.y;
+      const extra: typeof row = { ...row, ...lucroOverlap.points[i] };
+      for (const pie of lucroEndPies) {
+        if (pie.idx === i) extra[pie.dataKey] = pie.y;
+      }
       return extra;
     });
-  }, [lucroOverRoundsData, lucroEndPies]);
+  }, [lucroOverRoundsData, lucroOverlap.points, lucroEndPies]);
 
   if (members.length === 0) {
     return (
@@ -816,6 +891,9 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
         <p className="mb-2 text-xs text-zinc-500">
           Cada linha é um time: o eixo X é o número de rodadas já registradas e o eixo Y é o total de
           vitórias até aquele ponto. Quem desistiu para de aparecer a partir da rodada da desistência.
+          Quando dois ou mais times empatam no mesmo valor, o trecho vira um tracejado intercalado com
+          as cores sobrepostas. No fim de cada linha, o total de vitórias aparece numa bolinha; se
+          vários times estão na mesma altura, as cores viram uma pizza.
         </p>
         {rounds.length === 0 ? (
           <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -825,7 +903,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
           <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
             <LineChartYAxisName>Vitórias</LineChartYAxisName>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={winsOverRoundsData} margin={{ top: 8, right: 12, left: LINE_CHART_LEFT, bottom: 28 }}>
+              <LineChart data={winsChartPoints} margin={{ top: 8, right: 20, left: LINE_CHART_LEFT, bottom: 28 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
                   dataKey="rodadas"
@@ -842,21 +920,25 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                       active={active}
                       payload={payload}
                       label={label}
+                      uniqueByName
+                      maxItems={Number.POSITIVE_INFINITY}
                       formatValue={(v) => `${v} vitória${v === 1 ? "" : "s"}`}
                     />
                   )}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                {lineSeries.map((s) => {
-                  const color = barColorForUserId(s.userId, isDarkMode);
+                {winsOverlap.unique.map((seg) => {
+                  const color = barColorForUserId(seg.userId, isDarkMode);
+                  const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
                   return (
                     <Line
-                      key={s.userId}
+                      key={seg.dataKey}
                       type="monotone"
-                      dataKey={s.userId}
-                      name={s.name}
+                      dataKey={seg.dataKey}
+                      name={name}
                       stroke={color}
                       strokeWidth={3}
+                      legendType={seg.isFirst ? "line" : "none"}
                       connectNulls={false}
                       activeDot={false}
                       dot={(props) => {
@@ -866,7 +948,9 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                             : Number((props.payload as { rodadas?: number } | undefined)?.rodadas);
                         const value = Number(props.value);
                         if (!Number.isFinite(k) || k <= 0 || !Number.isFinite(value)) return null;
-                        const prev = winsOverRoundsData[k - 1]?.[s.userId];
+                        const next = winsOverRoundsData[k + 1]?.[seg.userId];
+                        if (typeof next !== "number") return null;
+                        const prev = winsOverRoundsData[k - 1]?.[seg.userId];
                         if (typeof prev !== "number" || value <= prev) return null;
                         return (
                           <DroughtEndDot
@@ -881,6 +965,47 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                     />
                   );
                 })}
+                {winsOverlap.overlaps.map((ov) => {
+                  const color = barColorForUserId(ov.userId, isDarkMode);
+                  const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
+                  return (
+                    <Line
+                      key={ov.dataKey}
+                      type="linear"
+                      dataKey={ov.dataKey}
+                      name={name}
+                      stroke={color}
+                      strokeWidth={3}
+                      strokeDasharray={ov.dasharray}
+                      strokeDashoffset={ov.dashOffset}
+                      legendType={ov.showLegend ? "line" : "none"}
+                      dot={false}
+                      connectNulls={false}
+                      isAnimationActive={false}
+                    />
+                  );
+                })}
+                {winsEndPies.map((pie) => (
+                  <Line
+                    key={pie.dataKey}
+                    type="linear"
+                    dataKey={pie.dataKey}
+                    stroke="none"
+                    legendType="none"
+                    isAnimationActive={false}
+                    connectNulls={false}
+                    dot={(props) => (
+                      <DroughtEndPieDot
+                        cx={props.cx}
+                        cy={props.cy}
+                        value={props.value}
+                        colors={pie.userIds.map((id) => barColorForUserId(id, isDarkMode))}
+                        textColor={isDarkMode ? "#fafafa" : "#18181b"}
+                      />
+                    )}
+                    activeDot={false}
+                  />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -895,6 +1020,8 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
           próxima sequência começa do zero, sem ligar os dois. Quem desistiu também termina na bolinha e
           segue tracejado até a última rodada registrada. No fim das linhas contínuas, o jejum atual
           aparece numa bolinha; se vários times estão na mesma altura, as cores viram uma pizza.
+          Trechos em que várias linhas coincidem aparecem em tracejado intercalado com as cores
+          sobrepostas.
         </p>
         {rounds.length === 0 ? (
           <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -932,7 +1059,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                   )}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                {droughtStreakChart.segments.map((seg) => {
+                {droughtOverlap.unique.map((seg) => {
                   const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
                   const color = barColorForUserId(seg.userId, isDarkMode);
                   return (
@@ -942,28 +1069,31 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                       dataKey={seg.dataKey}
                       name={name}
                       stroke={color}
-                      strokeWidth={3}
+                      strokeWidth={seg.dashed ? 2 : 3}
+                      strokeDasharray={seg.dashed ? "7 5" : undefined}
                       legendType={seg.isFirst ? "line" : "none"}
                       dot={false}
                       connectNulls={false}
                     />
                   );
                 })}
-                {droughtStreakChart.dashes.map((dash) => {
-                  const name = lineSeries.find((s) => s.userId === dash.userId)?.name ?? dash.userId;
-                  const color = barColorForUserId(dash.userId, isDarkMode);
+                {droughtOverlap.overlaps.map((ov) => {
+                  const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
+                  const color = barColorForUserId(ov.userId, isDarkMode);
                   return (
                     <Line
-                      key={dash.dataKey}
+                      key={ov.dataKey}
                       type="linear"
-                      dataKey={dash.dataKey}
+                      dataKey={ov.dataKey}
                       name={name}
                       stroke={color}
-                      strokeWidth={2}
-                      strokeDasharray="7 5"
-                      legendType="none"
+                      strokeWidth={3}
+                      strokeDasharray={ov.dasharray}
+                      strokeDashoffset={ov.dashOffset}
+                      legendType={ov.showLegend ? "line" : "none"}
                       dot={false}
                       connectNulls={false}
+                      isAnimationActive={false}
                     />
                   );
                 })}
@@ -1023,7 +1153,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
         <p className="mb-2 text-xs text-zinc-500">
           Cada linha é o lucro acumulado daquele time: sobe na vitória (recebe dos outros ativos) e desce
           quando perde (paga o valor da rodada). Quem desistiu para de aparecer a partir da rodada da
-          desistência.
+          desistência. Trechos empatados viram um tracejado intercalado com as cores sobrepostas.
         </p>
         {rounds.length === 0 ? (
           <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -1056,24 +1186,48 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                       active={active}
                       payload={payload}
                       label={label}
+                      uniqueByName
+                      maxItems={Number.POSITIVE_INFINITY}
                       formatValue={(v) => formatBRL(Number(v))}
                     />
                   )}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                {lineSeries.map((s) => {
-                  const color = barColorForUserId(s.userId, isDarkMode);
+                {lucroOverlap.unique.map((seg) => {
+                  const color = barColorForUserId(seg.userId, isDarkMode);
+                  const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
                   return (
                     <Line
-                      key={s.userId}
+                      key={seg.dataKey}
                       type="linear"
-                      dataKey={s.userId}
-                      name={s.name}
+                      dataKey={seg.dataKey}
+                      name={name}
                       stroke={color}
                       strokeWidth={3}
+                      legendType={seg.isFirst ? "line" : "none"}
                       connectNulls={false}
                       dot={false}
                       activeDot={false}
+                    />
+                  );
+                })}
+                {lucroOverlap.overlaps.map((ov) => {
+                  const color = barColorForUserId(ov.userId, isDarkMode);
+                  const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
+                  return (
+                    <Line
+                      key={ov.dataKey}
+                      type="linear"
+                      dataKey={ov.dataKey}
+                      name={name}
+                      stroke={color}
+                      strokeWidth={3}
+                      strokeDasharray={ov.dasharray}
+                      strokeDashoffset={ov.dashOffset}
+                      legendType={ov.showLegend ? "line" : "none"}
+                      dot={false}
+                      connectNulls={false}
+                      isAnimationActive={false}
                     />
                   );
                 })}
