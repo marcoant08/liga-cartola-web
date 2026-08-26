@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -114,6 +114,36 @@ const tooltipWrapperStyle = {
   outline: "none",
 } as const;
 
+const lineTooltipWrapperStyle = {
+  outline: "none",
+  zIndex: 50,
+  overflow: "hidden",
+  backgroundColor: "var(--background)",
+  borderRadius: 8,
+  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06)",
+  maxWidth: "calc(100vw - 16px)",
+} as const;
+
+const VIEWPORT_X_PAD = 8;
+
+function clampRechartsTooltipToViewportX(node: HTMLElement | null) {
+  const wrapper = node?.closest(".recharts-tooltip-wrapper") as HTMLElement | null;
+  if (!wrapper) return;
+  wrapper.style.translate = "0px";
+  const rect = wrapper.getBoundingClientRect();
+  const vv = window.visualViewport;
+  const vw = vv?.width ?? window.innerWidth;
+  const minX = (vv?.offsetLeft ?? 0) + VIEWPORT_X_PAD;
+  const maxX = minX + vw - VIEWPORT_X_PAD * 2;
+  let shift = 0;
+  if (rect.left < minX) shift = minX - rect.left;
+  if (rect.right + shift > maxX) shift = maxX - rect.right;
+  if (rect.left + shift < minX) shift = minX - rect.left;
+  wrapper.style.translate = shift ? `${shift}px` : "";
+}
+
+const TOOLTIP_TOP_N = 20;
+
 const Y_AXIS_WIDTH = 28;
 const Y_AXIS_MONEY_WIDTH = 42;
 const LINE_CHART_LEFT = 4;
@@ -187,12 +217,23 @@ function RankedLineTooltip({
   formatValue: (value: unknown, item?: { dataKey?: unknown }) => string;
   uniqueByName?: boolean;
 }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const apply = () => clampRechartsTooltipToViewportX(boxRef.current);
+    apply();
+    const id = requestAnimationFrame(apply);
+    return () => cancelAnimationFrame(id);
+  });
+
   if (!active || !payload?.length) return null;
   const k = typeof label === "number" ? label : Number(label);
   const isDashKey = (key: string) => key.includes("::d");
   const isSegKey = (key: string) => key.includes("::s");
   let items = payload
-    .filter((p) => p.value != null && !String(p.dataKey ?? "").includes("__dot"))
+    .filter((p) => {
+      const key = String(p.dataKey ?? "");
+      return p.value != null && !key.includes("__dot") && !key.includes("__endPie");
+    })
     .slice();
   const solids = items.filter((p) => isSegKey(String(p.dataKey ?? "")));
   items = items.filter((p) => {
@@ -226,20 +267,35 @@ function RankedLineTooltip({
     });
   }
   if (items.length === 0) return null;
+  const hidden = Math.max(0, items.length - TOOLTIP_TOP_N);
+  const visible = items.slice(0, TOOLTIP_TOP_N);
   return (
-    <div className="max-h-72 overflow-y-auto rounded-lg px-3 py-2 text-sm" style={tooltipContentStyle}>
+    <div
+      ref={boxRef}
+      className="rounded-lg px-3 py-2 text-sm bg-white dark:bg-zinc-900"
+      style={{ ...tooltipContentStyle, maxWidth: "calc(100vw - 16px)" }}
+    >
       <p style={tooltipLabelStyle}>
         {k === 0
           ? "Nenhuma rodada registrada"
           : `Após ${k} rodada${k === 1 ? "" : "s"} registrada${k === 1 ? "" : "s"}`}
       </p>
-      {items.map((p) => (
+      {visible.map((p) => (
         <p key={String(p.dataKey ?? p.name)} style={{ ...tooltipItemStyle, color: p.color }}>
           {p.name}: {formatValue(p.value, p)}
         </p>
       ))}
+      {hidden > 0 ? (
+        <p style={{ ...tooltipItemStyle, opacity: 0.7, marginTop: 4 }}>
+          e mais {hidden} time{hidden === 1 ? "" : "s"}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+function droughtMarkerRadius(label: string): number {
+  return label.length > 1 ? 11 : 9;
 }
 
 function DroughtEndDot({
@@ -259,7 +315,7 @@ function DroughtEndDot({
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
   const label = String(n);
-  const r = label.length > 1 ? 11 : 9;
+  const r = droughtMarkerRadius(label);
   return (
     <g>
       <circle cx={cx} cy={cy} r={r} fill={fill} stroke={textColor} strokeWidth={1} strokeOpacity={0.35} />
@@ -276,6 +332,72 @@ function DroughtEndDot({
       </text>
     </g>
   );
+}
+
+function pieSlicePath(cx: number, cy: number, r: number, start: number, end: number): string {
+  const x1 = cx + r * Math.cos(start);
+  const y1 = cy + r * Math.sin(start);
+  const x2 = cx + r * Math.cos(end);
+  const y2 = cy + r * Math.sin(end);
+  const large = end - start > Math.PI ? 1 : 0;
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+}
+
+/** Bolinha no último X: pizza com as cores de todos os times naquela altura de jejum. */
+function DroughtEndPieDot({
+  cx,
+  cy,
+  value,
+  colors,
+  textColor,
+}: {
+  cx?: number;
+  cy?: number;
+  value?: unknown;
+  colors: string[];
+  textColor: string;
+}) {
+  if (cx == null || cy == null || value == null || typeof value === "boolean") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || colors.length === 0) return null;
+  if (colors.length === 1) {
+    return <DroughtEndDot cx={cx} cy={cy} value={value} fill={colors[0]} textColor={textColor} />;
+  }
+  const label = String(n);
+  const r = droughtMarkerRadius(label) + 1;
+  const slice = (2 * Math.PI) / colors.length;
+  const start0 = -Math.PI / 2;
+  return (
+    <g>
+      {colors.map((color, i) => (
+        <path
+          key={`${color}-${i}`}
+          d={pieSlicePath(cx, cy, r, start0 + i * slice, start0 + (i + 1) * slice)}
+          fill={color}
+        />
+      ))}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={textColor} strokeWidth={1} strokeOpacity={0.35} />
+      <text
+        x={cx}
+        y={cy}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={10}
+        fontWeight={700}
+        fill={textColor}
+        stroke={textColor === "#fafafa" ? "#18181b" : "#fafafa"}
+        strokeWidth={3}
+        paintOrder="stroke fill"
+        strokeLinejoin="round"
+      >
+        {label}
+      </text>
+    </g>
+  );
+}
+
+function droughtEndPieKey(y: number): string {
+  return `__endPie::${y}`;
 }
 
 function formatMoneyTooltip(v: number): string {
@@ -503,6 +625,42 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
     [members],
   );
 
+  const droughtEndPies = useMemo(() => {
+    const last = droughtStreakChart.points[droughtStreakChart.points.length - 1];
+    if (!last) return [];
+    const nameOf = (id: string) => lineSeries.find((s) => s.userId === id)?.name ?? id;
+    const byY = new Map<number, Set<string>>();
+    const take = (userId: string, raw: unknown) => {
+      if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return;
+      let ids = byY.get(raw);
+      if (!ids) {
+        ids = new Set();
+        byY.set(raw, ids);
+      }
+      ids.add(userId);
+    };
+    for (const seg of droughtStreakChart.segments) take(seg.userId, last[seg.dataKey]);
+    return [...byY.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([y, ids]) => ({
+        y,
+        dataKey: droughtEndPieKey(y),
+        userIds: [...ids].sort((a, b) => nameOf(a).localeCompare(nameOf(b), "pt-BR")),
+      }));
+  }, [droughtStreakChart, lineSeries]);
+
+  const droughtStreakPoints = useMemo(() => {
+    const pts = droughtStreakChart.points;
+    if (pts.length === 0 || droughtEndPies.length === 0) return pts;
+    const lastIdx = pts.length - 1;
+    return pts.map((row, i) => {
+      if (i !== lastIdx) return row;
+      const extra: typeof row = { ...row };
+      for (const pie of droughtEndPies) extra[pie.dataKey] = pie.y;
+      return extra;
+    });
+  }, [droughtStreakChart.points, droughtEndPies]);
+
   if (members.length === 0) {
     return (
       <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -570,7 +728,8 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                 />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={2} />
                 <Tooltip
-                  wrapperStyle={tooltipWrapperStyle}
+                  allowEscapeViewBox={{ x: false, y: true }}
+                  wrapperStyle={lineTooltipWrapperStyle}
                   content={({ active, payload, label }) => (
                     <RankedLineTooltip
                       active={active}
@@ -627,7 +786,8 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
           Cada linha é o jejum consecutivo daquele time: sobe a cada rodada sem vencer. Quando a sequência
           termina (vitória), a linha para numa bolinha e segue tracejada na mesma altura até o fim. A
           próxima sequência começa do zero, sem ligar os dois. Quem desistiu também termina na bolinha e
-          segue tracejado até a última rodada registrada.
+          segue tracejado até a última rodada registrada. No fim das linhas contínuas, o jejum atual
+          aparece numa bolinha; se vários times estão na mesma altura, as cores viram uma pizza.
         </p>
         {rounds.length === 0 ? (
           <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -637,7 +797,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
           <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
             <LineChartYAxisName>Jejum</LineChartYAxisName>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={droughtStreakChart.points} margin={{ top: 8, right: 12, left: LINE_CHART_LEFT, bottom: 28 }}>
+              <LineChart data={droughtStreakPoints} margin={{ top: 8, right: 20, left: LINE_CHART_LEFT, bottom: 28 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
                   dataKey="rodadas"
@@ -647,7 +807,8 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                 />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={2} />
                 <Tooltip
-                  wrapperStyle={tooltipWrapperStyle}
+                  allowEscapeViewBox={{ x: false, y: true }}
+                  wrapperStyle={lineTooltipWrapperStyle}
                   content={({ active, payload, label }) => (
                     <RankedLineTooltip
                       active={active}
@@ -723,6 +884,27 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                     />
                   );
                 })}
+                {droughtEndPies.map((pie) => (
+                  <Line
+                    key={pie.dataKey}
+                    type="linear"
+                    dataKey={pie.dataKey}
+                    stroke="none"
+                    legendType="none"
+                    isAnimationActive={false}
+                    connectNulls={false}
+                    dot={(props) => (
+                      <DroughtEndPieDot
+                        cx={props.cx}
+                        cy={props.cy}
+                        value={props.value}
+                        colors={pie.userIds.map((id) => barColorForUserId(id, isDarkMode))}
+                        textColor={isDarkMode ? "#fafafa" : "#18181b"}
+                      />
+                    )}
+                    activeDot={false}
+                  />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </div>
