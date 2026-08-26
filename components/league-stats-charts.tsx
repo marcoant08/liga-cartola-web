@@ -23,8 +23,10 @@ import {
 import type { Deserter, LeagueMember, Round } from "@/lib/types/api";
 import {
   aggregateWinnerStats,
+  computeDroughtStreakOverRegisteredRounds,
   computeRoundsSinceLastWin,
   computeWinsOverRegisteredRounds,
+  droughtStreakDotKey,
   topDroughtHistoryEvents,
   topWinStreakHistoryEvents,
   type SeasonPlayerLine,
@@ -152,10 +154,12 @@ function SequenceHistoryTooltip({
   );
 }
 
-function WinsOverRoundsTooltip({
+function RankedLineTooltip({
   active,
   payload,
   label,
+  formatValue,
+  uniqueByName = false,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{
@@ -165,11 +169,16 @@ function WinsOverRoundsTooltip({
     dataKey?: unknown;
   }>;
   label?: unknown;
+  formatValue: (value: unknown) => string;
+  uniqueByName?: boolean;
 }) {
   if (!active || !payload?.length) return null;
   const k = typeof label === "number" ? label : Number(label);
-  const items = payload
-    .filter((p) => p.value != null)
+  let items = payload
+    .filter((p) => {
+      const key = String(p.dataKey ?? "");
+      return p.value != null && !key.includes("__dot") && !key.includes("::d");
+    })
     .slice()
     .sort((a, b) => {
       const va = Number(a.value);
@@ -177,6 +186,15 @@ function WinsOverRoundsTooltip({
       if (vb !== va) return vb - va;
       return String(a.name ?? "").localeCompare(String(b.name ?? ""), "pt-BR");
     });
+  if (uniqueByName) {
+    const seen = new Set<string>();
+    items = items.filter((p) => {
+      const n = String(p.name ?? "");
+      if (seen.has(n)) return false;
+      seen.add(n);
+      return true;
+    });
+  }
   if (items.length === 0) return null;
   return (
     <div className="max-h-72 overflow-y-auto rounded-lg px-3 py-2 text-sm" style={tooltipContentStyle}>
@@ -187,10 +205,46 @@ function WinsOverRoundsTooltip({
       </p>
       {items.map((p) => (
         <p key={String(p.dataKey ?? p.name)} style={{ ...tooltipItemStyle, color: p.color }}>
-          {p.name}: {String(p.value)} vitória{p.value === 1 ? "" : "s"}
+          {p.name}: {formatValue(p.value)}
         </p>
       ))}
     </div>
+  );
+}
+
+function DroughtEndDot({
+  cx,
+  cy,
+  value,
+  fill,
+  textColor,
+}: {
+  cx?: number;
+  cy?: number;
+  value?: unknown;
+  fill: string;
+  textColor: string;
+}) {
+  if (cx == null || cy == null || value == null || typeof value === "boolean") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const label = String(n);
+  const r = label.length > 1 ? 11 : 9;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill={fill} stroke={textColor} strokeWidth={1} strokeOpacity={0.35} />
+      <text
+        x={cx}
+        y={cy}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={10}
+        fontWeight={700}
+        fill={textColor}
+      >
+        {label}
+      </text>
+    </g>
   );
 }
 
@@ -405,6 +459,11 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
     [members, rounds, deserters],
   );
 
+  const droughtStreakChart = useMemo(
+    () => computeDroughtStreakOverRegisteredRounds(members, rounds, deserters),
+    [members, rounds, deserters],
+  );
+
   const lineSeries = useMemo(
     () =>
       members.map((m) => ({
@@ -486,7 +545,12 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                 <Tooltip
                   wrapperStyle={tooltipWrapperStyle}
                   content={({ active, payload, label }) => (
-                    <WinsOverRoundsTooltip active={active} payload={payload} label={label} />
+                    <RankedLineTooltip
+                      active={active}
+                      payload={payload}
+                      label={label}
+                      formatValue={(v) => `${v} vitória${v === 1 ? "" : "s"}`}
+                    />
                   )}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -502,6 +566,114 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                     connectNulls={false}
                   />
                 ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Histórico de sequências de derrota</h2>
+        <p className="mb-2 text-xs text-zinc-500">
+          Cada linha é o jejum consecutivo daquele time: sobe a cada rodada sem vencer. Quando a sequência
+          termina (vitória), a linha para numa bolinha e segue tracejada na mesma altura até o fim. A
+          próxima sequência começa do zero, sem ligar os dois. Quem desistiu também termina na bolinha e
+          segue tracejado até a última rodada registrada.
+        </p>
+        {rounds.length === 0 ? (
+          <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
+            Sem rodadas registradas ainda.
+          </p>
+        ) : (
+          <div className="h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={droughtStreakChart.points} margin={{ top: 8, right: 16, left: 8, bottom: 28 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
+                <XAxis
+                  dataKey="rodadas"
+                  allowDecimals={false}
+                  tick={{ fontSize: 11 }}
+                  label={{ value: "Rodadas registradas", position: "insideBottom", offset: -2, fontSize: 11 }}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fontSize: 11 }}
+                  label={{ value: "Jejum", angle: -90, position: "insideLeft", fontSize: 11 }}
+                />
+                <Tooltip
+                  wrapperStyle={tooltipWrapperStyle}
+                  content={({ active, payload, label }) => (
+                    <RankedLineTooltip
+                      active={active}
+                      payload={payload}
+                      label={label}
+                      uniqueByName
+                      formatValue={(v) =>
+                        `${v} rodada${v === 1 ? "" : "s"} sem vencer`
+                      }
+                    />
+                  )}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {droughtStreakChart.segments.map((seg) => {
+                  const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
+                  const color = barColorForUserId(seg.userId, isDarkMode);
+                  return (
+                    <Line
+                      key={seg.dataKey}
+                      type="linear"
+                      dataKey={seg.dataKey}
+                      name={name}
+                      stroke={color}
+                      strokeWidth={3}
+                      legendType={seg.isFirst ? "line" : "none"}
+                      dot={false}
+                      connectNulls={false}
+                    />
+                  );
+                })}
+                {droughtStreakChart.dashes.map((dash) => {
+                  const name = lineSeries.find((s) => s.userId === dash.userId)?.name ?? dash.userId;
+                  const color = barColorForUserId(dash.userId, isDarkMode);
+                  return (
+                    <Line
+                      key={dash.dataKey}
+                      type="linear"
+                      dataKey={dash.dataKey}
+                      name={name}
+                      stroke={color}
+                      strokeWidth={2}
+                      strokeDasharray="7 5"
+                      legendType="none"
+                      dot={false}
+                      connectNulls={false}
+                    />
+                  );
+                })}
+                {lineSeries.map((s) => {
+                  const color = barColorForUserId(s.userId, isDarkMode);
+                  return (
+                    <Line
+                      key={droughtStreakDotKey(s.userId)}
+                      type="linear"
+                      dataKey={droughtStreakDotKey(s.userId)}
+                      name={s.name}
+                      stroke="none"
+                      legendType="none"
+                      connectNulls={false}
+                      dot={(props) => (
+                        <DroughtEndDot
+                          cx={props.cx}
+                          cy={props.cy}
+                          value={props.value}
+                          fill={color}
+                          textColor={isDarkMode ? "#fafafa" : "#18181b"}
+                        />
+                      )}
+                      activeDot={false}
+                    />
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
           </div>

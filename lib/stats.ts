@@ -272,6 +272,150 @@ export function computeWinsOverRegisteredRounds(
   return points;
 }
 
+/**
+ * Jejum consecutivo após k rodadas registradas.
+ * Cada sequência é uma série à parte: ao vencer, a linha anterior termina (com marcador no pico)
+ * e a próxima começa do zero, sem conectar os dois.
+ */
+export function droughtStreakSegKey(userId: string, segment: number): string {
+  return `${userId}::s${segment}`;
+}
+
+export function droughtStreakDotKey(userId: string): string {
+  return `${userId}::__dot`;
+}
+
+export function droughtStreakDashKey(userId: string, segment: number): string {
+  return `${userId}::d${segment}`;
+}
+
+export type DroughtStreakSegmentSeries = {
+  userId: string;
+  dataKey: string;
+  isFirst: boolean;
+};
+
+export type DroughtStreakDashSeries = {
+  userId: string;
+  dataKey: string;
+};
+
+export type DroughtStreakOverRoundsResult = {
+  points: WinsOverRegisteredRoundPoint[];
+  segments: DroughtStreakSegmentSeries[];
+  dashes: DroughtStreakDashSeries[];
+};
+
+export function computeDroughtStreakOverRegisteredRounds(
+  members: LeagueMember[],
+  rounds: Round[],
+  deserters: Deserter[] = [],
+): DroughtStreakOverRoundsResult {
+  if (members.length === 0) {
+    return { points: [], segments: [], dashes: [] };
+  }
+
+  const deserterMap = new Map(deserters.map((d) => [d.memberId, d.desertedAtRound]));
+  const timeline = canonicalRoundsTimeline(rounds);
+  const lastK = timeline.length;
+  const streak = new Map<string, number>(members.map((m) => [m.userId, 0]));
+  const segIdx = new Map<string, number>(members.map((m) => [m.userId, 0]));
+  const maxSeg = new Map<string, number>(members.map((m) => [m.userId, 0]));
+  const inactive = new Set<string>();
+  const dashes: DroughtStreakDashSeries[] = [];
+  const dashKeys = new Set<string>();
+
+  const points: WinsOverRegisteredRoundPoint[] = Array.from(
+    { length: lastK + 1 },
+    (_, k) => ({ rodadas: k }),
+  );
+
+  const paintDash = (userId: string, segment: number, fromK: number, value: number) => {
+    const key = droughtStreakDashKey(userId, segment);
+    for (let t = fromK; t <= lastK; t++) {
+      points[t][key] = value;
+    }
+    if (!dashKeys.has(key)) {
+      dashKeys.add(key);
+      dashes.push({ userId, dataKey: key });
+    }
+  };
+
+  for (const m of members) {
+    points[0][droughtStreakSegKey(m.userId, 0)] = 0;
+  }
+
+  for (let i = 0; i < timeline.length; i++) {
+    const r = timeline[i];
+    const k = i + 1;
+    const prev = i;
+
+    for (const m of members) {
+      const cutoff = memberRoundCutoff(m.userId, deserterMap);
+      if (r.roundNumber >= cutoff) {
+        if (!inactive.has(m.userId)) {
+          const s = streak.get(m.userId) ?? 0;
+          if (s > 0) {
+            points[prev][droughtStreakDotKey(m.userId)] = s;
+            paintDash(m.userId, segIdx.get(m.userId) ?? 0, prev, s);
+          }
+          inactive.add(m.userId);
+        }
+        continue;
+      }
+
+      if (r.winnerId === m.userId) {
+        const s = streak.get(m.userId) ?? 0;
+        if (s > 0) {
+          const endedSeg = segIdx.get(m.userId) ?? 0;
+          points[prev][droughtStreakDotKey(m.userId)] = s;
+          paintDash(m.userId, endedSeg, prev, s);
+          const nextSeg = endedSeg + 1;
+          segIdx.set(m.userId, nextSeg);
+          maxSeg.set(m.userId, nextSeg);
+          streak.set(m.userId, 0);
+          points[k][droughtStreakSegKey(m.userId, nextSeg)] = 0;
+        } else {
+          points[k][droughtStreakSegKey(m.userId, segIdx.get(m.userId) ?? 0)] = 0;
+        }
+      } else {
+        const next = (streak.get(m.userId) ?? 0) + 1;
+        streak.set(m.userId, next);
+        points[k][droughtStreakSegKey(m.userId, segIdx.get(m.userId) ?? 0)] = next;
+      }
+    }
+  }
+
+  const segments: DroughtStreakSegmentSeries[] = [];
+  for (const m of members) {
+    const last = maxSeg.get(m.userId) ?? 0;
+    for (let s = 0; s <= last; s++) {
+      segments.push({
+        userId: m.userId,
+        dataKey: droughtStreakSegKey(m.userId, s),
+        isFirst: s === 0,
+      });
+    }
+  }
+
+  for (const row of points) {
+    for (const m of members) {
+      const last = maxSeg.get(m.userId) ?? 0;
+      for (let s = 0; s <= last; s++) {
+        const key = droughtStreakSegKey(m.userId, s);
+        if (row[key] === undefined) row[key] = null;
+      }
+      const dKey = droughtStreakDotKey(m.userId);
+      if (row[dKey] === undefined) row[dKey] = null;
+    }
+    for (const dash of dashes) {
+      if (row[dash.dataKey] === undefined) row[dash.dataKey] = null;
+    }
+  }
+
+  return { points, segments, dashes };
+}
+
 export function buildWinnerByRound(rounds: Round[]): Map<number, string> {
   const map = new Map<number, string>();
   for (const r of canonicalRoundsTimeline(rounds)) {
