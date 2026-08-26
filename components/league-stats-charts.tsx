@@ -24,9 +24,11 @@ import type { Deserter, LeagueMember, Round } from "@/lib/types/api";
 import {
   aggregateWinnerStats,
   computeDroughtStreakOverRegisteredRounds,
+  computeLucroOverRegisteredRounds,
   computeRoundsSinceLastWin,
   computeWinsOverRegisteredRounds,
   droughtStreakDotKey,
+  formatBRL,
   topDroughtHistoryEvents,
   topWinStreakHistoryEvents,
   type SeasonPlayerLine,
@@ -232,7 +234,7 @@ function RankedLineTooltip({
   let items = payload
     .filter((p) => {
       const key = String(p.dataKey ?? "");
-      return p.value != null && !key.includes("__dot") && !key.includes("__endPie");
+      return p.value != null && !key.includes("__dot") && !key.includes("__endPie") && !key.includes("__lucroPie");
     })
     .slice();
   const solids = items.filter((p) => isSegKey(String(p.dataKey ?? "")));
@@ -295,8 +297,14 @@ function RankedLineTooltip({
 }
 
 function droughtMarkerRadius(label: string): number {
-  return label.length > 1 ? 11 : 9;
+  if (label.length <= 1) return 9;
+  if (label.length <= 2) return 11;
+  if (label.length <= 4) return 13;
+  return 16;
 }
+
+const LUCRO_MARKER_R = 16;
+const LUCRO_RING_WIDTH = 3.5;
 
 function DroughtEndDot({
   cx,
@@ -304,27 +312,39 @@ function DroughtEndDot({
   value,
   fill,
   textColor,
+  label: labelOverride,
+  ring,
 }: {
   cx?: number;
   cy?: number;
   value?: unknown;
   fill: string;
   textColor: string;
+  label?: string;
+  ring?: string;
 }) {
   if (cx == null || cy == null || value == null || typeof value === "boolean") return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
-  const label = String(n);
-  const r = droughtMarkerRadius(label);
+  const label = labelOverride ?? String(n);
+  const r = ring ? LUCRO_MARKER_R : droughtMarkerRadius(label);
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill={fill} stroke={textColor} strokeWidth={1} strokeOpacity={0.35} />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill={fill}
+        stroke={ring ?? textColor}
+        strokeWidth={ring ? LUCRO_RING_WIDTH : 1}
+        strokeOpacity={ring ? 1 : 0.35}
+      />
       <text
         x={cx}
         y={cy}
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={10}
+        fontSize={label.length > 4 ? 8 : 10}
         fontWeight={700}
         fill={textColor}
       >
@@ -350,21 +370,35 @@ function DroughtEndPieDot({
   value,
   colors,
   textColor,
+  label: labelOverride,
+  ring,
 }: {
   cx?: number;
   cy?: number;
   value?: unknown;
   colors: string[];
   textColor: string;
+  label?: string;
+  ring?: string;
 }) {
   if (cx == null || cy == null || value == null || typeof value === "boolean") return null;
   const n = Number(value);
   if (!Number.isFinite(n) || colors.length === 0) return null;
   if (colors.length === 1) {
-    return <DroughtEndDot cx={cx} cy={cy} value={value} fill={colors[0]} textColor={textColor} />;
+    return (
+      <DroughtEndDot
+        cx={cx}
+        cy={cy}
+        value={value}
+        fill={colors[0]}
+        textColor={textColor}
+        label={labelOverride}
+        ring={ring}
+      />
+    );
   }
-  const label = String(n);
-  const r = droughtMarkerRadius(label) + 1;
+  const label = labelOverride ?? String(n);
+  const r = ring ? LUCRO_MARKER_R : droughtMarkerRadius(label) + 1;
   const slice = (2 * Math.PI) / colors.length;
   const start0 = -Math.PI / 2;
   return (
@@ -376,13 +410,21 @@ function DroughtEndPieDot({
           fill={color}
         />
       ))}
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={textColor} strokeWidth={1} strokeOpacity={0.35} />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        stroke={ring ?? textColor}
+        strokeWidth={ring ? LUCRO_RING_WIDTH : 1}
+        strokeOpacity={ring ? 1 : 0.35}
+      />
       <text
         x={cx}
         y={cy}
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={10}
+        fontSize={label.length > 4 ? 8 : 10}
         fontWeight={700}
         fill={textColor}
         stroke={textColor === "#fafafa" ? "#18181b" : "#fafafa"}
@@ -400,8 +442,24 @@ function droughtEndPieKey(y: number): string {
   return `__endPie::${y}`;
 }
 
+function lucroEndPieKey(idx: number, y: number): string {
+  return `__lucroPie::${idx}::${y}`;
+}
+
 function formatMoneyTooltip(v: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+}
+
+function moneyAxisTick(v: number): string {
+  if (!Number.isFinite(v)) return "";
+  const n = Math.round(v);
+  return n < 0 ? `-R$${Math.abs(n)}` : `R$${n}`;
+}
+
+function lucroRingColor(y: number): string {
+  if (y > 0) return "#059669";
+  if (y < 0) return "#dc2626";
+  return "#ffffff";
 }
 
 type MoneyTooltipKind = "ganho" | "perda" | "lucro";
@@ -611,6 +669,11 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
     [members, rounds, deserters],
   );
 
+  const lucroOverRoundsData = useMemo(
+    () => computeLucroOverRegisteredRounds(members, rounds, roundValue, deserters),
+    [members, rounds, roundValue, deserters],
+  );
+
   const droughtStreakChart = useMemo(
     () => computeDroughtStreakOverRegisteredRounds(members, rounds, deserters),
     [members, rounds, deserters],
@@ -660,6 +723,50 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
       return extra;
     });
   }, [droughtStreakChart.points, droughtEndPies]);
+
+  const lucroEndPies = useMemo(() => {
+    const pts = lucroOverRoundsData;
+    if (pts.length === 0) return [];
+    const nameOf = (id: string) => lineSeries.find((s) => s.userId === id)?.name ?? id;
+    const groups = new Map<string, { idx: number; y: number; ids: Set<string> }>();
+    for (const s of lineSeries) {
+      let lastIdx = -1;
+      let lastY: number | null = null;
+      for (let i = 0; i < pts.length; i++) {
+        const v = pts[i][s.userId];
+        if (typeof v === "number" && Number.isFinite(v)) {
+          lastIdx = i;
+          lastY = v;
+        }
+      }
+      if (lastIdx < 0 || lastY == null) continue;
+      const key = `${lastIdx}::${lastY}`;
+      let g = groups.get(key);
+      if (!g) {
+        g = { idx: lastIdx, y: lastY, ids: new Set() };
+        groups.set(key, g);
+      }
+      g.ids.add(s.userId);
+    }
+    return [...groups.values()].map((g) => ({
+      idx: g.idx,
+      y: g.y,
+      dataKey: lucroEndPieKey(g.idx, g.y),
+      userIds: [...g.ids].sort((a, b) => nameOf(a).localeCompare(nameOf(b), "pt-BR")),
+    }));
+  }, [lucroOverRoundsData, lineSeries]);
+
+  const lucroChartPoints = useMemo(() => {
+    const pts = lucroOverRoundsData;
+    if (pts.length === 0 || lucroEndPies.length === 0) return pts;
+    return pts.map((row, i) => {
+      const extraPies = lucroEndPies.filter((pie) => pie.idx === i);
+      if (extraPies.length === 0) return row;
+      const extra: typeof row = { ...row };
+      for (const pie of extraPies) extra[pie.dataKey] = pie.y;
+      return extra;
+    });
+  }, [lucroOverRoundsData, lucroEndPies]);
 
   if (members.length === 0) {
     return (
@@ -900,6 +1007,94 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                         value={props.value}
                         colors={pie.userIds.map((id) => barColorForUserId(id, isDarkMode))}
                         textColor={isDarkMode ? "#fafafa" : "#18181b"}
+                      />
+                    )}
+                    activeDot={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Lucro ao longo das rodadas</h2>
+        <p className="mb-2 text-xs text-zinc-500">
+          Cada linha é o lucro acumulado daquele time: sobe na vitória (recebe dos outros ativos) e desce
+          quando perde (paga o valor da rodada). Quem desistiu para de aparecer a partir da rodada da
+          desistência.
+        </p>
+        {rounds.length === 0 ? (
+          <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
+            Sem rodadas registradas ainda.
+          </p>
+        ) : (
+          <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <LineChartYAxisName>Lucro</LineChartYAxisName>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={lucroChartPoints} margin={{ top: 8, right: 20, left: LINE_CHART_LEFT, bottom: 28 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
+                <XAxis
+                  dataKey="rodadas"
+                  allowDecimals={false}
+                  tick={{ fontSize: 11 }}
+                  label={{ value: "Rodadas registradas", position: "insideBottom", offset: -2, fontSize: 11 }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={moneyAxisTick}
+                  width={Y_AXIS_MONEY_WIDTH}
+                  tickMargin={2}
+                />
+                <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
+                <Tooltip
+                  allowEscapeViewBox={{ x: false, y: true }}
+                  wrapperStyle={lineTooltipWrapperStyle}
+                  content={({ active, payload, label }) => (
+                    <RankedLineTooltip
+                      active={active}
+                      payload={payload}
+                      label={label}
+                      formatValue={(v) => formatBRL(Number(v))}
+                    />
+                  )}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {lineSeries.map((s) => {
+                  const color = barColorForUserId(s.userId, isDarkMode);
+                  return (
+                    <Line
+                      key={s.userId}
+                      type="linear"
+                      dataKey={s.userId}
+                      name={s.name}
+                      stroke={color}
+                      strokeWidth={3}
+                      connectNulls={false}
+                      dot={false}
+                      activeDot={false}
+                    />
+                  );
+                })}
+                {lucroEndPies.map((pie) => (
+                  <Line
+                    key={pie.dataKey}
+                    type="linear"
+                    dataKey={pie.dataKey}
+                    stroke="none"
+                    legendType="none"
+                    isAnimationActive={false}
+                    connectNulls={false}
+                    dot={(props) => (
+                      <DroughtEndPieDot
+                        cx={props.cx}
+                        cy={props.cy}
+                        value={props.value}
+                        colors={pie.userIds.map((id) => barColorForUserId(id, isDarkMode))}
+                        textColor={isDarkMode ? "#fafafa" : "#18181b"}
+                        label={moneyAxisTick(pie.y)}
+                        ring={lucroRingColor(pie.y)}
                       />
                     )}
                     activeDot={false}

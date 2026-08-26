@@ -273,6 +273,62 @@ export function computeWinsOverRegisteredRounds(
 }
 
 /**
+ * Lucro acumulado após k rodadas já registradas (timeline canônica).
+ * k = 0 começa em 0 para todos. A cada rodada o campeão recebe (ativos − 1) × valor
+ * e cada perdedor ativo paga o valor da rodada. Desertores ficam `null` a partir da desistência.
+ */
+export function computeLucroOverRegisteredRounds(
+  members: LeagueMember[],
+  rounds: Round[],
+  roundValue: number,
+  deserters: Deserter[] = [],
+): WinsOverRegisteredRoundPoint[] {
+  if (members.length === 0) return [];
+  const rv = Number(roundValue);
+  if (!Number.isFinite(rv) || rv <= 0) return [];
+
+  const deserterMap = new Map(deserters.map((d) => [d.memberId, d.desertedAtRound]));
+  const timeline = canonicalRoundsTimeline(rounds);
+  const lucro = new Map<string, number>(members.map((m) => [m.userId, 0]));
+
+  const snapshot = (k: number, roundNumber: number | null): WinsOverRegisteredRoundPoint => {
+    const row: WinsOverRegisteredRoundPoint = { rodadas: k };
+    for (const m of members) {
+      const cutoff = memberRoundCutoff(m.userId, deserterMap);
+      if (roundNumber != null && roundNumber >= cutoff) {
+        row[m.userId] = null;
+      } else {
+        row[m.userId] = lucro.get(m.userId) ?? 0;
+      }
+    }
+    return row;
+  };
+
+  const points: WinsOverRegisteredRoundPoint[] = [snapshot(0, null)];
+
+  for (let i = 0; i < timeline.length; i++) {
+    const r = timeline[i];
+    const activeMembers = members.filter(
+      (m) => r.roundNumber < memberRoundCutoff(m.userId, deserterMap),
+    );
+    const activeCount = activeMembers.length;
+    if (activeCount >= 2) {
+      const perWinThisRound = (activeCount - 1) * rv;
+      for (const m of activeMembers) {
+        if (r.winnerId === m.userId) {
+          lucro.set(m.userId, (lucro.get(m.userId) ?? 0) + perWinThisRound);
+        } else {
+          lucro.set(m.userId, (lucro.get(m.userId) ?? 0) - rv);
+        }
+      }
+    }
+    points.push(snapshot(i + 1, r.roundNumber));
+  }
+
+  return points;
+}
+
+/**
  * Jejum consecutivo após k rodadas registradas.
  * Cada sequência é uma série à parte: ao vencer, a linha anterior termina (com marcador no pico)
  * e a próxima começa do zero, sem conectar os dois.
