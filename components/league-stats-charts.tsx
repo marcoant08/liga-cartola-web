@@ -322,7 +322,6 @@ function droughtMarkerRadius(label: string): number {
 }
 
 const LUCRO_MARKER_R = 16;
-const LUCRO_RING_WIDTH = 3.5;
 
 function DroughtEndDot({
   cx,
@@ -331,7 +330,10 @@ function DroughtEndDot({
   fill,
   textColor,
   label: labelOverride,
-  ring,
+  radius,
+  bordered = true,
+  borderColor,
+  textHalo,
 }: {
   cx?: number;
   cy?: number;
@@ -339,13 +341,17 @@ function DroughtEndDot({
   fill: string;
   textColor: string;
   label?: string;
-  ring?: string;
+  radius?: number;
+  bordered?: boolean;
+  borderColor?: string;
+  textHalo?: string;
 }) {
   if (cx == null || cy == null || value == null || typeof value === "boolean") return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
   const label = labelOverride ?? String(n);
-  const r = ring ? LUCRO_MARKER_R : droughtMarkerRadius(label);
+  const r = radius ?? droughtMarkerRadius(label);
+  const stroke = bordered ? (borderColor ?? textColor) : "none";
   return (
     <g>
       <circle
@@ -353,9 +359,9 @@ function DroughtEndDot({
         cy={cy}
         r={r}
         fill={fill}
-        stroke={ring ?? textColor}
-        strokeWidth={ring ? LUCRO_RING_WIDTH : 1}
-        strokeOpacity={ring ? 1 : 0.35}
+        stroke={stroke}
+        strokeWidth={bordered ? 1 : 0}
+        strokeOpacity={bordered ? 0.35 : 0}
       />
       <text
         x={cx}
@@ -365,6 +371,10 @@ function DroughtEndDot({
         fontSize={label.length > 4 ? 8 : 10}
         fontWeight={700}
         fill={textColor}
+        stroke={textHalo}
+        strokeWidth={textHalo ? 3 : 0}
+        paintOrder={textHalo ? "stroke fill" : undefined}
+        strokeLinejoin={textHalo ? "round" : undefined}
       >
         {label}
       </text>
@@ -389,7 +399,10 @@ function DroughtEndPieDot({
   colors,
   textColor,
   label: labelOverride,
-  ring,
+  radius,
+  bordered = true,
+  borderColor,
+  textHalo,
 }: {
   cx?: number;
   cy?: number;
@@ -397,7 +410,10 @@ function DroughtEndPieDot({
   colors: string[];
   textColor: string;
   label?: string;
-  ring?: string;
+  radius?: number;
+  bordered?: boolean;
+  borderColor?: string;
+  textHalo?: string;
 }) {
   if (cx == null || cy == null || value == null || typeof value === "boolean") return null;
   const n = Number(value);
@@ -411,14 +427,19 @@ function DroughtEndPieDot({
         fill={colors[0]}
         textColor={textColor}
         label={labelOverride}
-        ring={ring}
+        radius={radius}
+        bordered={bordered}
+        borderColor={borderColor}
+        textHalo={textHalo}
       />
     );
   }
   const label = labelOverride ?? String(n);
-  const r = ring ? LUCRO_MARKER_R : droughtMarkerRadius(label) + 1;
+  const r = radius ?? droughtMarkerRadius(label) + 1;
   const slice = (2 * Math.PI) / colors.length;
   const start0 = -Math.PI / 2;
+  const halo = textHalo ?? (textColor === "#fafafa" ? "#18181b" : "#fafafa");
+  const stroke = borderColor ?? textColor;
   return (
     <g>
       {colors.map((color, i) => (
@@ -428,15 +449,17 @@ function DroughtEndPieDot({
           fill={color}
         />
       ))}
-      <circle
-        cx={cx}
-        cy={cy}
-        r={r}
-        fill="none"
-        stroke={ring ?? textColor}
-        strokeWidth={ring ? LUCRO_RING_WIDTH : 1}
-        strokeOpacity={ring ? 1 : 0.35}
-      />
+      {bordered ? (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={1}
+          strokeOpacity={0.35}
+        />
+      ) : null}
       <text
         x={cx}
         y={cy}
@@ -445,7 +468,7 @@ function DroughtEndPieDot({
         fontSize={label.length > 4 ? 8 : 10}
         fontWeight={700}
         fill={textColor}
-        stroke={textColor === "#fafafa" ? "#18181b" : "#fafafa"}
+        stroke={halo}
         strokeWidth={3}
         paintOrder="stroke fill"
         strokeLinejoin="round"
@@ -513,10 +536,14 @@ function moneyAxisTick(v: number): string {
   return n < 0 ? `-R$${Math.abs(n)}` : `R$${n}`;
 }
 
-function lucroRingColor(y: number): string {
+function lucroLabelColor(y: number): string {
   if (y > 0) return "#059669";
   if (y < 0) return "#dc2626";
   return "#ffffff";
+}
+
+function lucroLabelHalo(y: number): string {
+  return y === 0 ? "#18181b" : "#fafafa";
 }
 
 type MoneyTooltipKind = "ganho" | "perda" | "lucro";
@@ -1249,9 +1276,11 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                         cy={props.cy}
                         value={props.value}
                         colors={pie.userIds.map((id) => barColorForUserId(id, isDarkMode))}
-                        textColor={isDarkMode ? "#fafafa" : "#18181b"}
+                        textColor={lucroLabelColor(pie.y)}
                         label={moneyAxisTick(pie.y)}
-                        ring={lucroRingColor(pie.y)}
+                        radius={LUCRO_MARKER_R}
+                        borderColor={isDarkMode ? "#fafafa" : "#18181b"}
+                        textHalo={lucroLabelHalo(pie.y)}
                       />
                     )}
                     activeDot={false}
