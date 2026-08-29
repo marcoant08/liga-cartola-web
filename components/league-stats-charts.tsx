@@ -151,6 +151,7 @@ const TOOLTIP_TOP_N = 20;
 const Y_AXIS_WIDTH = 28;
 const Y_AXIS_MONEY_WIDTH = 42;
 const LINE_CHART_LEFT = 4;
+const CHART_INITIAL_SIZE = { width: 400, height: 320 };
 const LINE_CHART_MARGIN = { top: 8, right: 20, left: LINE_CHART_LEFT, bottom: 28 };
 const LINE_CHART_X_LABEL = {
   value: "Rodadas registradas",
@@ -992,7 +993,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
         ) : (
           <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
             <LineChartYAxisName>Vitórias</LineChartYAxisName>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <LineChart data={winsChartPoints} margin={LINE_CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
@@ -1122,7 +1123,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
         ) : (
           <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
             <LineChartYAxisName>Derrotas</LineChartYAxisName>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <LineChart data={droughtStreakPoints} margin={LINE_CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
@@ -1300,7 +1301,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
         ) : (
           <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
             <LineChartYAxisName>Derrotas</LineChartYAxisName>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <LineChart data={droughtConnectedPoints} margin={LINE_CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
@@ -1430,7 +1431,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
         ) : (
           <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
             <LineChartYAxisName>Lucro</LineChartYAxisName>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <LineChart data={lucroChartPoints} margin={LINE_CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
@@ -1545,7 +1546,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
           </p>
         ) : (
           <div className="h-72 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <BarChart data={droughtBarData} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
@@ -1584,7 +1585,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
             rodadas.
           </p>
           <div className="h-80 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <BarChart data={top10DroughtHistoryData} margin={{ top: 8, right: 8, left: 0, bottom: 64 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="categoria" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
@@ -1619,7 +1620,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
             Mostra apenas sequências de 2+ rodadas.
           </p>
           <div className="h-80 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <BarChart data={top10WinStreakHistoryData} margin={{ top: 8, right: 8, left: 0, bottom: 64 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="categoria" angle={-25} textAnchor="end" height={72} tick={{ fontSize: 11 }} />
@@ -1650,7 +1651,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
       <section>
         <h2 className="mb-2 text-lg font-semibold">Vitórias por participante</h2>
         <div className="h-72 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
             <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
               <XAxis dataKey="nome" angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
@@ -1686,7 +1687,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
             Estimado: vitórias × (participantes − 1) × valor da rodada.
           </p>
           <div className="h-72 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <BarChart data={top5Ganhos} margin={{ top: 8, right: 8, left: 4, bottom: 52 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
@@ -1715,7 +1716,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
             Valores negativos: rodadas registradas em que não venceu × valor da rodada.
           </p>
           <div className="h-72 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <BarChart data={top5Perdas} margin={{ top: 8, right: 8, left: 4, bottom: 52 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
@@ -1742,7 +1743,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
           <h2 className="mb-2 text-lg font-semibold">Top 5 — maiores lucros</h2>
           <p className="mb-2 text-xs text-zinc-500">Recebimentos + perdas (estimado).</p>
           <div className="h-72 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
               <BarChart data={top5Lucros} margin={{ top: 8, right: 8, left: 4, bottom: 52 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis dataKey="nome" angle={-25} textAnchor="end" height={56} tick={{ fontSize: 10 }} />
@@ -1773,7 +1774,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
       <section>
         <h2 className="mb-2 text-lg font-semibold">Participação nas vitórias (%)</h2>
         <div className="h-72 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_SIZE}>
             <PieChart>
               <Pie
                 data={pieData}
