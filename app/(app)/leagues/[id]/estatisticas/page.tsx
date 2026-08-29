@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LeagueStatsCharts } from "@/components/league-stats-charts";
 import { LeagueStatsTextBlocks } from "@/components/league-stats-text-blocks";
 import { SitePresenceStats } from "@/components/site-presence-stats";
+import { StatsPageFloatControls } from "@/components/stats-page-float-controls";
 import { useAuth } from "@/contexts/auth-context";
 import { leaguesApi } from "@/lib/api/leagues";
 import { leagueAccessErrorMessage } from "@/lib/league-access-error";
@@ -77,12 +78,18 @@ export default function LeagueStatsPage() {
   const totalRounds = rounds.length;
 
   if (isLoading) {
-    return <p className="text-zinc-500">Carregando estatísticas…</p>;
+    return (
+      <div>
+        <StatsPageFloatControls />
+        <p className="text-zinc-500">Carregando estatísticas…</p>
+      </div>
+    );
   }
 
   if (error || !league) {
     return (
       <div>
+        <StatsPageFloatControls />
         <Link
           href={user ? "/" : "/login"}
           className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
@@ -101,7 +108,8 @@ export default function LeagueStatsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Estatísticas — {league.name}</h1>
+      <StatsPageFloatControls />
+      <h1 className="pr-14 text-2xl font-semibold">Estatísticas — {league.name}</h1>
 
       {isPublicLeague && !isMember && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
@@ -216,7 +224,7 @@ export default function LeagueStatsPage() {
         lastRound={seasonStats.lastRound}
       />
 
-      <div className="mt-12">
+      <div id="graficos" className="mt-12 scroll-mt-4">
         <h2 className="mb-4 text-lg font-semibold">Gráficos</h2>
         <LeagueStatsCharts
           rounds={rounds}

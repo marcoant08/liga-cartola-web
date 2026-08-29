@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  color-scheme: light;
   --team-chart-1: #b91c1c;
   --team-chart-2: #166534;
   --team-chart-3: #a16207;
@@ -32,31 +35,30 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --team-chart-1: #fca5a5;
-    --team-chart-2: #86efac;
-    --team-chart-3: #fde047;
-    --team-chart-4: #93c5fd;
-    --team-chart-5: #fdba74;
-    --team-chart-6: #d8b4fe;
-    --team-chart-7: #5eead4;
-    --team-chart-8: #f9a8d4;
-    --team-chart-9: #bef264;
-    --team-chart-10: #fda4af;
-    --team-chart-11: #67e8f9;
-    --team-chart-12: #c4b5fd;
-    --team-chart-13: #fcd34d;
-    --team-chart-14: #fda4af;
-    --team-chart-15: #fca5a5;
-    --team-chart-16: #99f6e4;
-    --team-chart-17: #d9f99d;
-    --team-chart-18: #fdba74;
-    --team-chart-19: #a5b4fc;
-    --team-chart-20: #d1d5db;
-  }
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --team-chart-1: #fca5a5;
+  --team-chart-2: #86efac;
+  --team-chart-3: #fde047;
+  --team-chart-4: #93c5fd;
+  --team-chart-5: #fdba74;
+  --team-chart-6: #d8b4fe;
+  --team-chart-7: #5eead4;
+  --team-chart-8: #f9a8d4;
+  --team-chart-9: #bef264;
+  --team-chart-10: #fda4af;
+  --team-chart-11: #67e8f9;
+  --team-chart-12: #c4b5fd;
+  --team-chart-13: #fcd34d;
+  --team-chart-14: #fda4af;
+  --team-chart-15: #fca5a5;
+  --team-chart-16: #99f6e4;
+  --team-chart-17: #d9f99d;
+  --team-chart-18: #fdba74;
+  --team-chart-19: #a5b4fc;
+  --team-chart-20: #d1d5db;
+  color-scheme: dark;
 }
 
 body {

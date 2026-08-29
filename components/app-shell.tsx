@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const memberNav = [
   { href: "/", label: "Minhas ligas" },
@@ -70,6 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </nav>
           <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+            <ThemeToggle />
             {user ? (
               <>
                 <span className="max-w-[200px] truncate" title={user.email}>

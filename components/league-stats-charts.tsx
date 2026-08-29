@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import {
   Bar,
   BarChart,
@@ -21,6 +21,7 @@ import {
   type BarShapeProps,
 } from "recharts";
 import type { Deserter, LeagueMember, Round } from "@/lib/types/api";
+import { useTheme } from "@/contexts/theme-context";
 import {
   aggregateWinnerStats,
   computeDroughtStreakOverRegisteredRounds,
@@ -625,15 +626,8 @@ type Props = {
 };
 
 export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [], players }: Props) {
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    const update = () => setIsDarkMode(mql.matches);
-    update();
-    mql.addEventListener("change", update);
-    return () => mql.removeEventListener("change", update);
-  }, []);
+  const { theme } = useTheme();
+  const isDarkMode = theme === "dark";
 
   const ranking = useMemo(
     () => aggregateWinnerStats(rounds, roundValue, members, deserters),
