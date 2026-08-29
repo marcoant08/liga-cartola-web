@@ -866,6 +866,62 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
     });
   }, [droughtStreakChart.points, droughtOverlap.points, droughtEndPies]);
 
+  const droughtConnectedBase = useMemo(() => {
+    const merged = droughtStreakChart.points.map((row) => {
+      const out: typeof row = { rodadas: row.rodadas };
+      for (const s of lineSeries) {
+        let v: number | null = null;
+        for (const seg of droughtStreakChart.segments) {
+          if (seg.userId !== s.userId) continue;
+          const raw = row[seg.dataKey];
+          if (typeof raw === "number" && Number.isFinite(raw)) {
+            v = raw;
+            break;
+          }
+        }
+        out[s.userId] = v;
+      }
+      return out;
+    });
+    const lastIdx = merged.length - 1;
+    return merged.map((row, i) => {
+      const out: typeof row = { ...row };
+      for (const s of lineSeries) {
+        const dKey = droughtStreakDotKey(s.userId);
+        const peak = droughtStreakChart.points[i]?.[dKey];
+        const v = row[s.userId];
+        const prev = i > 0 ? merged[i - 1][s.userId] : null;
+        const droppedToZero = v === 0 && typeof prev === "number" && prev > 0;
+        if (typeof peak === "number" && Number.isFinite(peak)) {
+          out[dKey] = peak;
+        } else if (droppedToZero && i !== lastIdx) {
+          out[dKey] = 0;
+        } else {
+          out[dKey] = null;
+        }
+      }
+      return out;
+    });
+  }, [droughtStreakChart.points, droughtStreakChart.segments, lineSeries]);
+
+  const droughtConnectedOverlap = useMemo(
+    () => patternOverlappingLines(droughtConnectedBase, memberLineRefs),
+    [droughtConnectedBase, memberLineRefs],
+  );
+
+  const droughtConnectedPoints = useMemo(() => {
+    const pts = droughtConnectedBase;
+    if (pts.length === 0) return pts;
+    const lastIdx = pts.length - 1;
+    return pts.map((row, i) => {
+      const extra: typeof row = { ...row, ...droughtConnectedOverlap.points[i] };
+      if (i === lastIdx) {
+        for (const pie of droughtEndPies) extra[pie.dataKey] = pie.y;
+      }
+      return extra;
+    });
+  }, [droughtConnectedBase, droughtConnectedOverlap.points, droughtEndPies]);
+
   const lucroEndPies = useMemo(
     () => groupLineEndPies(lucroOverRoundsData, lineSeries, lucroEndPieKey),
     [lucroOverRoundsData, lineSeries],
@@ -1212,6 +1268,136 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                 {droughtEndPies.map((pie) => (
                   <Line
                     key={pie.dataKey}
+                    type="linear"
+                    dataKey={pie.dataKey}
+                    stroke="none"
+                    legendType="none"
+                    isAnimationActive={false}
+                    connectNulls={false}
+                    dot={(props) => (
+                      <DroughtEndPieDot
+                        cx={props.cx}
+                        cy={props.cy}
+                        value={props.value}
+                        colors={pie.userIds.map((id) => barColorForUserId(id, isDarkMode))}
+                        textColor={isDarkMode ? "#fafafa" : "#18181b"}
+                      />
+                    )}
+                    activeDot={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Histórico de sequências de derrota (contínuo)</h2>
+        <p className="mb-2 text-xs text-zinc-500">
+          Igual ao gráfico acima, sem as continuações tracejadas. Cada time tem uma única linha contínua: ao
+          vencer, o jejum volta a zero na rodada seguinte e a linha desce até lá, sem quebrar. A bolinha
+          continua no pico da sequência encerrada e no jejum atual.
+        </p>
+        {rounds.length === 0 ? (
+          <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">
+            Sem rodadas registradas ainda.
+          </p>
+        ) : (
+          <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <LineChartYAxisName>Derrotas</LineChartYAxisName>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={droughtConnectedPoints} margin={LINE_CHART_MARGIN}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
+                <XAxis
+                  dataKey="rodadas"
+                  allowDecimals={false}
+                  tick={{ fontSize: 11 }}
+                  label={LINE_CHART_X_LABEL}
+                />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={2} />
+                <Tooltip
+                  allowEscapeViewBox={{ x: false, y: true }}
+                  wrapperStyle={lineTooltipWrapperStyle}
+                  content={({ active, payload, label }) => (
+                    <RankedLineTooltip
+                      active={active}
+                      payload={payload}
+                      label={label}
+                      uniqueByName
+                      maxItems={Number.POSITIVE_INFINITY}
+                      formatValue={(v) => {
+                        const n = Number(v);
+                        return `${v} rodada${n === 1 ? "" : "s"} sem vencer`;
+                      }}
+                    />
+                  )}
+                />
+                <Legend wrapperStyle={LINE_CHART_LEGEND_STYLE} />
+                {droughtConnectedOverlap.overlaps.map((ov) => {
+                  const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
+                  const color = barColorForUserId(ov.userId, isDarkMode);
+                  return (
+                    <Line
+                      key={ov.dataKey}
+                      type="linear"
+                      dataKey={ov.dataKey}
+                      name={name}
+                      stroke={color}
+                      strokeWidth={3}
+                      strokeDasharray={ov.dasharray}
+                      strokeDashoffset={ov.dashOffset}
+                      legendType={ov.showLegend ? "line" : "none"}
+                      dot={false}
+                      connectNulls={false}
+                      isAnimationActive={false}
+                    />
+                  );
+                })}
+                {droughtConnectedOverlap.unique.map((seg) => {
+                  const name = lineSeries.find((s) => s.userId === seg.userId)?.name ?? seg.userId;
+                  const color = barColorForUserId(seg.userId, isDarkMode);
+                  return (
+                    <Line
+                      key={seg.dataKey}
+                      type="linear"
+                      dataKey={seg.dataKey}
+                      name={name}
+                      stroke={color}
+                      strokeWidth={3}
+                      legendType={seg.isFirst ? "line" : "none"}
+                      dot={false}
+                      connectNulls={false}
+                    />
+                  );
+                })}
+                {lineSeries.map((s) => {
+                  const color = barColorForUserId(s.userId, isDarkMode);
+                  return (
+                    <Line
+                      key={`test-${droughtStreakDotKey(s.userId)}`}
+                      type="linear"
+                      dataKey={droughtStreakDotKey(s.userId)}
+                      name={s.name}
+                      stroke="none"
+                      legendType="none"
+                      connectNulls={false}
+                      dot={(props) => (
+                        <DroughtEndDot
+                          cx={props.cx}
+                          cy={props.cy}
+                          value={props.value}
+                          fill={color}
+                          textColor={isDarkMode ? "#fafafa" : "#18181b"}
+                        />
+                      )}
+                      activeDot={false}
+                    />
+                  );
+                })}
+                {droughtEndPies.map((pie) => (
+                  <Line
+                    key={`test-${pie.dataKey}`}
                     type="linear"
                     dataKey={pie.dataKey}
                     stroke="none"
