@@ -150,6 +150,14 @@ const TOOLTIP_TOP_N = 20;
 const Y_AXIS_WIDTH = 28;
 const Y_AXIS_MONEY_WIDTH = 42;
 const LINE_CHART_LEFT = 4;
+const LINE_CHART_MARGIN = { top: 8, right: 20, left: LINE_CHART_LEFT, bottom: 28 };
+const LINE_CHART_X_LABEL = {
+  value: "Rodadas registradas",
+  position: "insideBottom" as const,
+  offset: -2,
+  fontSize: 11,
+};
+const LINE_CHART_LEGEND_STYLE = { fontSize: 11, paddingTop: 8 };
 
 function LineChartYAxisName({ children }: { children: string }) {
   return (
@@ -814,7 +822,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
     const nameOf = (id: string) => lineSeries.find((s) => s.userId === id)?.name ?? id;
     const byY = new Map<number, Set<string>>();
     const take = (userId: string, raw: unknown) => {
-      if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return;
+      if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) return;
       let ids = byY.get(raw);
       if (!ids) {
         ids = new Set();
@@ -935,13 +943,13 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
           <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
             <LineChartYAxisName>Vitórias</LineChartYAxisName>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={winsChartPoints} margin={{ top: 8, right: 20, left: LINE_CHART_LEFT, bottom: 28 }}>
+              <LineChart data={winsChartPoints} margin={LINE_CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
                   dataKey="rodadas"
                   allowDecimals={false}
                   tick={{ fontSize: 11 }}
-                  label={{ value: "Rodadas registradas", position: "insideBottom", offset: -2, fontSize: 11 }}
+                  label={LINE_CHART_X_LABEL}
                 />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={2} />
                 <Tooltip
@@ -958,7 +966,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                     />
                   )}
                 />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend wrapperStyle={LINE_CHART_LEGEND_STYLE} />
                 {winsOverlap.overlaps.map((ov) => {
                   const color = barColorForUserId(ov.userId, isDarkMode);
                   const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
@@ -1063,15 +1071,15 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
           </p>
         ) : (
           <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-            <LineChartYAxisName>Jejum</LineChartYAxisName>
+            <LineChartYAxisName>Derrotas</LineChartYAxisName>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={droughtStreakPoints} margin={{ top: 8, right: 20, left: LINE_CHART_LEFT, bottom: 28 }}>
+              <LineChart data={droughtStreakPoints} margin={LINE_CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
                   dataKey="rodadas"
                   allowDecimals={false}
                   tick={{ fontSize: 11 }}
-                  label={{ value: "Rodadas registradas", position: "insideBottom", offset: -2, fontSize: 11 }}
+                  label={LINE_CHART_X_LABEL}
                 />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={Y_AXIS_WIDTH} tickMargin={2} />
                 <Tooltip
@@ -1092,7 +1100,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                     />
                   )}
                 />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend wrapperStyle={LINE_CHART_LEGEND_STYLE} />
                 {droughtOverlap.unique
                   .filter((seg) => seg.dashed)
                   .map((seg) => {
@@ -1243,13 +1251,13 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
           <div className="relative h-96 w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
             <LineChartYAxisName>Lucro</LineChartYAxisName>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lucroChartPoints} margin={{ top: 8, right: 20, left: LINE_CHART_LEFT, bottom: 28 }}>
+              <LineChart data={lucroChartPoints} margin={LINE_CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
                 <XAxis
                   dataKey="rodadas"
                   allowDecimals={false}
                   tick={{ fontSize: 11 }}
-                  label={{ value: "Rodadas registradas", position: "insideBottom", offset: -2, fontSize: 11 }}
+                  label={LINE_CHART_X_LABEL}
                 />
                 <YAxis
                   tick={{ fontSize: 11 }}
@@ -1272,7 +1280,7 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
                     />
                   )}
                 />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend wrapperStyle={LINE_CHART_LEGEND_STYLE} />
                 {lucroOverlap.overlaps.map((ov) => {
                   const color = barColorForUserId(ov.userId, isDarkMode);
                   const name = lineSeries.find((s) => s.userId === ov.userId)?.name ?? ov.userId;
