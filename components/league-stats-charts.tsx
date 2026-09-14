@@ -1109,13 +1109,14 @@ export function LeagueStatsCharts({ rounds, roundValue, members, deserters = [],
         <h2 className="mb-2 text-lg font-semibold">Histórico de sequências de derrota</h2>
         <p className="mb-2 text-xs text-zinc-500">
           Cada linha é o jejum consecutivo daquele time: sobe a cada rodada sem vencer. Quando a sequência
-          termina (vitória), a linha para numa bolinha. Só a maior sequência encerrada daquele time segue
-          tracejada na mesma altura até o fim; jejuns menores param na bolinha. A próxima sequência começa
-          do zero, sem ligar os dois. Quem desistiu também termina na bolinha e, se aquele jejum for o
-          recorde dele, segue tracejado até a última rodada registrada. No fim das linhas contínuas, o
-          jejum atual aparece numa bolinha; se vários times estão na mesma altura, as cores viram uma pizza.
-          Trechos em que várias linhas coincidem aparecem em tracejado intercalado com as cores
-          sobrepostas.
+          termina (vitória), a linha para numa bolinha. O recorde segue tracejado na mesma altura até o
+          fim. Jejuns menores encerrados antes disso seguem tracejados na horizontal só até uma sequência
+          posterior alcançar aquela altura; depois do recorde, jejuns menores param na bolinha. A próxima
+          sequência começa do zero, sem ligar os dois. Quem desistiu também termina na bolinha e, se
+          aquele jejum for o recorde dele, segue tracejado até a última rodada registrada. No fim das
+          linhas contínuas, o jejum atual aparece numa bolinha; se vários times estão na mesma altura, as
+          cores viram uma pizza. Trechos em que várias linhas coincidem aparecem em tracejado intercalado
+          com as cores sobrepostas.
         </p>
         {rounds.length === 0 ? (
           <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50">

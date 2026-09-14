@@ -529,8 +529,9 @@ export function patternOverlappingLines(
 /**
  * Jejum consecutivo após k rodadas registradas.
  * Cada sequência é uma série à parte: ao vencer, a linha anterior termina (com marcador no pico)
- * e a próxima começa do zero, sem conectar os dois. A continuação tracejada só aparece na maior
- * sequência daquele jogador (encerrada ou ainda em curso).
+ * e a próxima começa do zero, sem conectar os dois. O recorde segue tracejado até o fim; jejuns
+ * menores encerrados antes disso seguem tracejados na horizontal só até uma sequência posterior
+ * alcançar a mesma altura.
  */
 export function droughtStreakSegKey(userId: string, segment: number): string {
   return `${userId}::s${segment}`;
@@ -586,9 +587,15 @@ export function computeDroughtStreakOverRegisteredRounds(
     (_, k) => ({ rodadas: k }),
   );
 
-  const paintDash = (userId: string, segment: number, fromK: number, value: number) => {
+  const paintDash = (
+    userId: string,
+    segment: number,
+    fromK: number,
+    toK: number,
+    value: number,
+  ) => {
     const key = droughtStreakDashKey(userId, segment);
-    for (let t = fromK; t <= lastK; t++) {
+    for (let t = fromK; t <= toK; t++) {
       points[t][key] = value;
     }
     if (!dashKeys.has(key)) {
@@ -650,10 +657,53 @@ export function computeDroughtStreakOverRegisteredRounds(
   for (const d of dashCandidates) {
     maxEndedByUser.set(d.userId, Math.max(maxEndedByUser.get(d.userId) ?? 0, d.value));
   }
+
+  const maxAllByUser = new Map<string, number>();
+  for (const m of members) {
+    const current = streak.get(m.userId) ?? 0;
+    maxAllByUser.set(m.userId, Math.max(current, maxEndedByUser.get(m.userId) ?? 0));
+  }
+
+  const firstRecordKByUser = new Map<string, number>();
+  for (const m of members) {
+    const maxAll = maxAllByUser.get(m.userId) ?? 0;
+    if (maxAll <= 0) continue;
+    const lastSeg = maxSeg.get(m.userId) ?? 0;
+    let found: number | undefined;
+    for (let k = 0; k <= lastK; k++) {
+      for (let s = 0; s <= lastSeg; s++) {
+        const v = points[k][droughtStreakSegKey(m.userId, s)];
+        if (typeof v === "number" && v === maxAll) {
+          found = k;
+          break;
+        }
+      }
+      if (found !== undefined) break;
+    }
+    if (found !== undefined) firstRecordKByUser.set(m.userId, found);
+  }
+
+  const catchUpK = (d: { userId: string; segment: number; fromK: number; value: number }) => {
+    const lastSeg = maxSeg.get(d.userId) ?? 0;
+    for (let t = d.fromK + 1; t <= lastK; t++) {
+      for (let s = d.segment + 1; s <= lastSeg; s++) {
+        const v = points[t][droughtStreakSegKey(d.userId, s)];
+        if (typeof v === "number" && v >= d.value) return t;
+      }
+    }
+    return null;
+  };
+
   for (const d of dashCandidates) {
-    const current = streak.get(d.userId) ?? 0;
-    const maxAll = Math.max(current, maxEndedByUser.get(d.userId) ?? 0);
-    if (d.value === maxAll) paintDash(d.userId, d.segment, d.fromK, d.value);
+    const maxAll = maxAllByUser.get(d.userId) ?? 0;
+    if (d.value === maxAll) {
+      paintDash(d.userId, d.segment, d.fromK, lastK, d.value);
+      continue;
+    }
+    const firstRecordK = firstRecordKByUser.get(d.userId);
+    if (firstRecordK === undefined || d.fromK >= firstRecordK) continue;
+    const toK = catchUpK(d);
+    if (toK != null) paintDash(d.userId, d.segment, d.fromK, toK, d.value);
   }
 
   const segments: DroughtStreakSegmentSeries[] = [];
