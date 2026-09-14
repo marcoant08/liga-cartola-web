@@ -529,7 +529,8 @@ export function patternOverlappingLines(
 /**
  * Jejum consecutivo após k rodadas registradas.
  * Cada sequência é uma série à parte: ao vencer, a linha anterior termina (com marcador no pico)
- * e a próxima começa do zero, sem conectar os dois.
+ * e a próxima começa do zero, sem conectar os dois. A continuação tracejada só aparece na maior
+ * sequência daquele jogador (encerrada ou ainda em curso).
  */
 export function droughtStreakSegKey(userId: string, segment: number): string {
   return `${userId}::s${segment}`;
@@ -578,6 +579,7 @@ export function computeDroughtStreakOverRegisteredRounds(
   const inactive = new Set<string>();
   const dashes: DroughtStreakDashSeries[] = [];
   const dashKeys = new Set<string>();
+  const dashCandidates: { userId: string; segment: number; fromK: number; value: number }[] = [];
 
   const points: WinsOverRegisteredRoundPoint[] = Array.from(
     { length: lastK + 1 },
@@ -593,6 +595,10 @@ export function computeDroughtStreakOverRegisteredRounds(
       dashKeys.add(key);
       dashes.push({ userId, dataKey: key });
     }
+  };
+
+  const queueDash = (userId: string, segment: number, fromK: number, value: number) => {
+    dashCandidates.push({ userId, segment, fromK, value });
   };
 
   for (const m of members) {
@@ -611,7 +617,7 @@ export function computeDroughtStreakOverRegisteredRounds(
           const s = streak.get(m.userId) ?? 0;
           if (s > 0) {
             points[prev][droughtStreakDotKey(m.userId)] = s;
-            paintDash(m.userId, segIdx.get(m.userId) ?? 0, prev, s);
+            queueDash(m.userId, segIdx.get(m.userId) ?? 0, prev, s);
           }
           inactive.add(m.userId);
         }
@@ -623,7 +629,7 @@ export function computeDroughtStreakOverRegisteredRounds(
         if (s > 0) {
           const endedSeg = segIdx.get(m.userId) ?? 0;
           points[prev][droughtStreakDotKey(m.userId)] = s;
-          paintDash(m.userId, endedSeg, prev, s);
+          queueDash(m.userId, endedSeg, prev, s);
           const nextSeg = endedSeg + 1;
           segIdx.set(m.userId, nextSeg);
           maxSeg.set(m.userId, nextSeg);
@@ -638,6 +644,16 @@ export function computeDroughtStreakOverRegisteredRounds(
         points[k][droughtStreakSegKey(m.userId, segIdx.get(m.userId) ?? 0)] = next;
       }
     }
+  }
+
+  const maxEndedByUser = new Map<string, number>();
+  for (const d of dashCandidates) {
+    maxEndedByUser.set(d.userId, Math.max(maxEndedByUser.get(d.userId) ?? 0, d.value));
+  }
+  for (const d of dashCandidates) {
+    const current = streak.get(d.userId) ?? 0;
+    const maxAll = Math.max(current, maxEndedByUser.get(d.userId) ?? 0);
+    if (d.value === maxAll) paintDash(d.userId, d.segment, d.fromK, d.value);
   }
 
   const segments: DroughtStreakSegmentSeries[] = [];
